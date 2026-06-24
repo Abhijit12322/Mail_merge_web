@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let csvHeaders = [];     // List of headers detected in the CSV
   let currentPreviewIndex = 0;
   let activeInputField = null; // Tracks if subject or body was focused last
-  let uploadedAttachments = {}; // Filename -> File object map
+  let uploadedAttachments = {}; // Map of filename -> File object
   
   // Sending state variables
   let isSending = false;
@@ -34,12 +34,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadSampleCsvLink = document.getElementById('download-sample-csv');
   const placeholdersList = document.getElementById('placeholders-list');
 
-  // Sidebar (Unique Attachments)
+  // Attachments Selectors
   const attachmentsDropzone = document.getElementById('attachments-dropzone');
   const attachmentsFileInput = document.getElementById('attachments-file-input');
-  const attachmentColumnSelect = document.getElementById('attachment-column-select');
-  const attachmentsSummary = document.getElementById('attachments-summary');
-  const attachmentsCount = document.getElementById('attachments-count');
+  const attachmentsListContainer = document.getElementById('attachments-list-container');
+  const attachmentsCountEl = document.getElementById('attachments-count');
+  const attachmentsList = document.getElementById('attachments-list');
+  const btnClearAttachments = document.getElementById('btn-clear-attachments');
 
   // Tabs
   const tabLinks = document.querySelectorAll('.tab-link');
@@ -61,8 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewFromHeader = document.getElementById('preview-from-header');
   const previewToHeader = document.getElementById('preview-to-header');
   const previewSubjectHeader = document.getElementById('preview-subject-header');
-  const previewAttachmentRow = document.getElementById('preview-attachment-row');
-  const previewAttachmentHeader = document.getElementById('preview-attachment-header');
   const previewRenderedBody = document.getElementById('preview-rendered-body');
 
   // Tab 3: Sending Dashboard
@@ -104,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Initial Setup & Load Cache ---
   loadSmtpSettings();
   setupSampleCSVDownload();
-  setupAttachmentsHandlers();
 
   // Track focused field for placeholder insertion
   emailSubject.addEventListener('focus', () => activeInputField = emailSubject);
@@ -308,6 +306,113 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // --- Attachments dropzone handlers ---
+  attachmentsDropzone.addEventListener('click', () => attachmentsFileInput.click());
+
+  attachmentsDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    attachmentsDropzone.classList.add('dragover');
+  });
+
+  attachmentsDropzone.addEventListener('dragleave', () => {
+    attachmentsDropzone.classList.remove('dragover');
+  });
+
+  attachmentsDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    attachmentsDropzone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleAttachmentsUpload(files);
+    }
+  });
+
+  attachmentsFileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleAttachmentsUpload(e.target.files);
+    }
+  });
+
+  btnClearAttachments.addEventListener('click', (e) => {
+    e.preventDefault();
+    uploadedAttachments = {};
+    renderAttachmentsList();
+  });
+
+  function handleAttachmentsUpload(fileList) {
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      uploadedAttachments[file.name] = file;
+    }
+    renderAttachmentsList();
+  }
+
+  function renderAttachmentsList() {
+    attachmentsList.innerHTML = '';
+    const fileNames = Object.keys(uploadedAttachments);
+    const count = fileNames.length;
+    
+    attachmentsCountEl.textContent = count;
+    
+    if (count > 0) {
+      attachmentsListContainer.classList.remove('hidden');
+      fileNames.forEach(name => {
+        const file = uploadedAttachments[name];
+        const sizeKB = Math.round(file.size / 1024);
+        
+        const li = document.createElement('li');
+        li.style.display = 'flex';
+        li.style.justifyContent = 'space-between';
+        li.style.alignItems = 'center';
+        li.style.background = 'rgba(255, 255, 255, 0.02)';
+        li.style.border = '1px solid var(--border-color)';
+        li.style.borderRadius = '6px';
+        li.style.padding = '6px 10px';
+        li.style.fontSize = '0.8rem';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.style.color = 'var(--text-primary)';
+        nameSpan.style.textOverflow = 'ellipsis';
+        nameSpan.style.overflow = 'hidden';
+        nameSpan.style.whiteSpace = 'nowrap';
+        nameSpan.style.maxWidth = '180px';
+        nameSpan.innerHTML = `<i class="fa-regular fa-file" style="margin-right: 6px; color: var(--primary);"></i>${name}`;
+        
+        const sizeSpan = document.createElement('span');
+        sizeSpan.style.color = 'var(--text-muted)';
+        sizeSpan.style.fontSize = '0.7rem';
+        sizeSpan.style.marginLeft = 'auto';
+        sizeSpan.style.paddingRight = '8px';
+        sizeSpan.textContent = `${sizeKB} KB`;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.style.background = 'transparent';
+        removeBtn.style.border = 'none';
+        removeBtn.style.color = 'var(--color-danger)';
+        removeBtn.style.cursor = 'pointer';
+        removeBtn.style.outline = 'none';
+        removeBtn.style.fontSize = '0.95rem';
+        removeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        removeBtn.addEventListener('click', () => {
+          delete uploadedAttachments[name];
+          renderAttachmentsList();
+        });
+        
+        li.appendChild(nameSpan);
+        li.appendChild(sizeSpan);
+        li.appendChild(removeBtn);
+        attachmentsList.appendChild(li);
+      });
+    } else {
+      attachmentsListContainer.classList.add('hidden');
+    }
+    
+    if (recipientsData.length > 0) {
+      updateLivePreview();
+    }
+  }
+
   function handleFileUpload(file) {
     const fileExtension = file.name.split('.').pop().toLowerCase();
     
@@ -387,25 +492,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Generate dynamic placeholders
     generatePlaceholderBadges(csvHeaders);
-
-    // Populate Attachment Mapping Dropdown
-    attachmentColumnSelect.innerHTML = '<option value="">-- None (No Attachments) --</option>';
-    let bestAttachmentMatch = "";
-    csvHeaders.forEach(h => {
-      const option = document.createElement('option');
-      option.value = h;
-      option.textContent = h;
-      attachmentColumnSelect.appendChild(option);
-
-      // Auto-detect a file column if one matches typical naming
-      if (/attachment|file|pdf|invoice|document|cert/i.test(h) && !bestAttachmentMatch) {
-        bestAttachmentMatch = h;
-      }
-    });
-
-    if (bestAttachmentMatch) {
-      attachmentColumnSelect.value = bestAttachmentMatch;
-    }
 
     // Populate Preview Controls
     currentPreviewIndex = 0;
@@ -533,8 +619,10 @@ document.addEventListener('DOMContentLoaded', () => {
       previewFromHeader.textContent = 'Sender Name <smtp-user>';
       previewToHeader.textContent = 'recipient@domain.com';
       previewSubjectHeader.textContent = 'Email Subject';
-      previewAttachmentRow.classList.add('hidden');
       previewRenderedBody.innerHTML = '<div style="color: #64748b; font-style: italic;">No recipients loaded. Upload a CSV to view customized previews.</div>';
+      
+      const previewAttachmentRow = document.getElementById('preview-attachment-row');
+      if (previewAttachmentRow) previewAttachmentRow.classList.add('hidden');
       return;
     }
 
@@ -560,30 +648,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     previewSubjectHeader.textContent = subjectRendered;
 
-    // Unique Attachment Status Render
-    const selectedAttCol = attachmentColumnSelect.value;
-    if (selectedAttCol && row[selectedAttCol]) {
-      const filename = String(row[selectedAttCol]).trim();
-      if (filename) {
-        previewAttachmentRow.classList.remove('hidden');
-        if (uploadedAttachments[filename]) {
-          previewAttachmentHeader.innerHTML = `<span style="color: var(--color-success); font-weight: 500;"><i class="fa-solid fa-circle-check"></i> ${filename} (Uploaded)</span>`;
-        } else {
-          previewAttachmentHeader.innerHTML = `<span style="color: var(--color-warning); font-weight: 500;"><i class="fa-solid fa-triangle-exclamation"></i> ${filename} (Missing Upload)</span>`;
-        }
-      } else {
-        previewAttachmentRow.classList.add('hidden');
-      }
-    } else {
-      previewAttachmentRow.classList.add('hidden');
-    }
-
     // Check if body contains HTML tags to render dynamically
     const hasHtml = /<[a-z][\s\S]*>/i.test(bodyRendered);
     if (hasHtml) {
       previewRenderedBody.innerHTML = bodyRendered;
     } else {
       previewRenderedBody.textContent = bodyRendered;
+    }
+
+    // Attachment Row Rendering in Preview
+    const previewAttachmentRow = document.getElementById('preview-attachment-row');
+    const previewAttachmentHeader = document.getElementById('preview-attachment-header');
+    
+    if (previewAttachmentRow && previewAttachmentHeader) {
+      const headers = Object.keys(row);
+      const attachmentCol = headers.find(h => 
+        ['attachment', 'attachmentname', 'file', 'filename', 'document'].includes(h.toLowerCase())
+      );
+
+      if (attachmentCol && row[attachmentCol]) {
+        const filename = String(row[attachmentCol]).trim();
+        previewAttachmentRow.classList.remove('hidden');
+        
+        const fileExists = !!uploadedAttachments[filename];
+        if (fileExists) {
+          previewAttachmentHeader.style.color = 'var(--color-success)';
+          previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-paperclip"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Ready to send)</span>`;
+        } else {
+          previewAttachmentHeader.style.color = 'var(--color-danger)';
+          previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Missing in Browser Uploads!)</span>`;
+        }
+      } else {
+        previewAttachmentRow.classList.add('hidden');
+      }
     }
   }
 
@@ -808,6 +905,18 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSendingStats();
   }
 
+  function getFileBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64String = reader.result.split(',')[1];
+        resolve(base64String);
+      };
+      reader.onerror = error => reject(error);
+    });
+  }
+
   async function processNextQueueItem() {
     if (!isSending || isPaused) return;
 
@@ -832,6 +941,49 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingCount--;
     updateSendingStats();
 
+    // Check for matching attachment columns
+    const headers = Object.keys(row);
+    const attachmentCol = headers.find(h => 
+      ['attachment', 'attachmentname', 'file', 'filename', 'document'].includes(h.toLowerCase())
+    );
+
+    let attachmentsPayload = null;
+    if (attachmentCol && row[attachmentCol]) {
+      const filename = String(row[attachmentCol]).trim();
+      const file = uploadedAttachments[filename];
+      if (file) {
+        try {
+          const base64Content = await getFileBase64(file);
+          attachmentsPayload = [{
+            filename: file.name,
+            content: base64Content,
+            contentType: file.type
+          }];
+        } catch (err) {
+          failedCount++;
+          if (logRow) logRow.remove(); // Remove the "sending" status log
+          logSendStatus(currentQueueIndex, row.Email, subjectRendered, 'failed', `Attachment read error: ${err.message}`);
+          currentQueueIndex++;
+          updateSendingStats();
+          if (isSending && !isPaused) {
+            sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
+          }
+          return;
+        }
+      } else {
+        // Filename specified in CSV, but file is not uploaded in the browser!
+        failedCount++;
+        if (logRow) logRow.remove(); // Remove the "sending" status log
+        logSendStatus(currentQueueIndex, row.Email, subjectRendered, 'failed', `Missing attachment: file '${filename}' not uploaded in browser.`);
+        currentQueueIndex++;
+        updateSendingStats();
+        if (isSending && !isPaused) {
+          sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
+        }
+        return;
+      }
+    }
+
     // Prepare payload
     const emailPayload = {
       smtpConfig: smtpSettings,
@@ -840,56 +992,12 @@ document.addEventListener('DOMContentLoaded', () => {
         to: row.Email,
         subject: subjectRendered,
         html: /<[a-z][\s\S]*>/i.test(bodyRendered) ? bodyRendered : undefined,
-        text: /<[a-z][\s\S]*>/i.test(bodyRendered) ? undefined : bodyRendered
+        text: /<[a-z][\s\S]*>/i.test(bodyRendered) ? undefined : bodyRendered,
+        attachments: attachmentsPayload || undefined
       }
     };
 
-    // Attach unique document if mapped
-    const selectedAttCol = attachmentColumnSelect.value;
-    if (selectedAttCol && row[selectedAttCol]) {
-      const filename = String(row[selectedAttCol]).trim();
-      if (filename) {
-        const fileObj = uploadedAttachments[filename];
-        if (!fileObj) {
-          // File was listed in recipients list but not uploaded
-          failedCount++;
-          updateSendingStats();
-          updateLogRow(logRow, 'failed', `Missing attachment file: ${filename}`);
-          
-          currentQueueIndex++;
-          // Schedule next item
-          if (isSending && !isPaused) {
-            sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
-          }
-          return;
-        }
-
-        try {
-          updateLogRow(logRow, 'sending', `Reading file ${filename}...`);
-          const base64Content = await fileToBase64(fileObj);
-          emailPayload.email.attachments = [{
-            filename: fileObj.name,
-            content: base64Content,
-            contentType: fileObj.type
-          }];
-        } catch (fileErr) {
-          console.error(fileErr);
-          failedCount++;
-          updateSendingStats();
-          updateLogRow(logRow, 'failed', `Failed to read file: ${filename}`);
-          
-          currentQueueIndex++;
-          // Schedule next item
-          if (isSending && !isPaused) {
-            sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
-          }
-          return;
-        }
-      }
-    }
-
     try {
-      updateLogRow(logRow, 'sending', 'Sending email payload...');
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -991,61 +1099,6 @@ bruce.wayne@example.com,Bruce Wayne,Bat Cave,HERO100`;
         XLSX.writeFile(workbook, "mergemail_sample_recipients.xlsx");
       });
     }
-  }
-
-  function setupAttachmentsHandlers() {
-    attachmentsDropzone.addEventListener('click', () => attachmentsFileInput.click());
-
-    attachmentsDropzone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      attachmentsDropzone.classList.add('dragover');
-    });
-
-    attachmentsDropzone.addEventListener('dragleave', () => {
-      attachmentsDropzone.classList.remove('dragover');
-    });
-
-    attachmentsDropzone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      attachmentsDropzone.classList.remove('dragover');
-      handleAttachmentsSelection(e.dataTransfer.files);
-    });
-
-    attachmentsFileInput.addEventListener('change', (e) => {
-      handleAttachmentsSelection(e.target.files);
-    });
-
-    attachmentColumnSelect.addEventListener('change', () => {
-      updateLivePreview();
-    });
-  }
-
-  function handleAttachmentsSelection(files) {
-    if (files.length === 0) return;
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      // Save file object in memory indexed by its filename
-      uploadedAttachments[file.name] = file;
-    }
-
-    const fileCount = Object.keys(uploadedAttachments).length;
-    attachmentsCount.textContent = `${fileCount} file${fileCount !== 1 ? 's' : ''} uploaded`;
-    attachmentsSummary.classList.remove('hidden');
-
-    updateLivePreview();
-  }
-
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = error => reject(error);
-    });
   }
 
 });
