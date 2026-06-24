@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MergeMail - Premium Mail Merge Tool</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- PapaParse for CSV Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- Canvas Confetti for Celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Custom Styling -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">
+          <i class="fa-solid fa-paper-plane"></i>
+        </div>
+        <div class="logo-text">
+          <h1>Merge<span>Mail</span></h1>
+          <p>Personalized Bulk Emails Instantly</p>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <div id="smtp-status" class="smtp-status-indicator unconfigured">
+          <span class="status-dot"></span>
+          <span class="status-text">SMTP Not Configured</span>
+        </div>
+        <button id="btn-open-smtp" class="btn btn-secondary">
+          <i class="fa-solid fa-gear"></i> SMTP Settings
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="app-workspace">
+      
+      <!-- Left Panel: Recipient Upload & Tags -->
+      <aside class="sidebar-panel">
+        
+        <!-- Recipient Card -->
+        <div class="card panel-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-users"></i> 1. Recipient List</h3>
+          </div>
+          <div class="card-body">
+            <!-- CSV Dropzone -->
+            <div id="csv-dropzone" class="dropzone">
+              <input type="file" id="csv-file-input" accept=".csv" class="hidden-input">
+              <div class="dropzone-content">
+                <i class="fa-solid fa-file-csv upload-icon"></i>
+                <p class="dropzone-text">Drag & drop CSV file here or <span class="browse-link">Browse</span></p>
+                <span class="file-hint">CSV must include an "Email" column</span>
+              </div>
+            </div>
+
+            <!-- Recipient Summary -->
+            <div id="csv-summary" class="csv-summary hidden">
+              <div class="summary-stat">
+                <span class="summary-label">Recipients Loaded:</span>
+                <span id="recipient-count" class="summary-value">0</span>
+              </div>
+              <div class="summary-stat">
+                <span class="summary-label">Columns Detected:</span>
+                <span id="columns-count" class="summary-value">0</span>
+              </div>
+              <button id="btn-view-recipients" class="btn btn-sm btn-outline btn-full-width">
+                <i class="fa-solid fa-table"></i> View Recipient Data
+              </button>
+            </div>
+            
+            <a href="#" id="download-sample-csv" class="sample-link"><i class="fa-solid fa-download"></i> Download Sample CSV</a>
+          </div>
+        </div>
+
+        <!-- Dynamic Placeholders Card -->
+        <div class="card panel-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-tags"></i> 2. Placeholders</h3>
+          </div>
+          <div class="card-body">
+            <p class="help-text">Click a tag below to insert it at your cursor in the editor:</p>
+            <div id="placeholders-list" class="placeholders-container">
+              <span class="placeholder-tag static-tag" data-tag="Email">{{Email}}</span>
+              <span class="placeholder-tag static-tag" data-tag="Name">{{Name}}</span>
+              <!-- Dynamic tags from CSV header will be appended here -->
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Central Editing and Sending Area -->
+      <section class="main-panel">
+        <!-- Tabs Header -->
+        <div class="tabs-nav">
+          <button class="tab-link active" data-tab="tab-compose">
+            <i class="fa-solid fa-pen-nib"></i> Compose Template
+          </button>
+          <button class="tab-link" data-tab="tab-preview" id="tab-btn-preview">
+            <i class="fa-solid fa-eye"></i> Live Preview
+          </button>
+          <button class="tab-link" data-tab="tab-send" id="tab-btn-send">
+            <i class="fa-solid fa-share-from-square"></i> Sending Queue
+          </button>
+        </div>
+
+        <!-- Tab Content Areas -->
+        <div class="tab-content-container">
+          
+          <!-- TAB 1: COMPOSE -->
+          <div id="tab-compose" class="tab-content active">
+            <div class="card workspace-card">
+              <div class="compose-fields">
+                <div class="form-group">
+                  <label for="email-from-name">Sender Name (Optional)</label>
+                  <input type="text" id="email-from-name" placeholder="e.g. John Doe" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                  <label for="email-subject">Email Subject</label>
+                  <input type="text" id="email-subject" placeholder="Enter subject line (e.g. Hello {{Name}}!)" class="form-control font-medium">
+                </div>
+
+                <div class="form-group flex-grow-1">
+                  <div class="body-header">
+                    <label for="email-body">Email Body (Plain Text or HTML)</label>
+                    <div class="editor-tips">
+                      <span><i class="fa-solid fa-code"></i> HTML formatting supported</span>
+                    </div>
+                  </div>
+                  <textarea id="email-body" class="form-control body-textarea" placeholder="Write your email template here...&#10;&#10;Hi {{Name}},&#10;&#10;Welcome to our launch! Your registered email is {{Email}}.&#10;&#10;Best regards,&#10;The Team"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: LIVE PREVIEW -->
+          <div id="tab-preview" class="tab-content">
+            <div class="card workspace-card">
+              <!-- Navigation header for Previewing -->
+              <div class="preview-toolbar">
+                <div class="preview-selector">
+                  <button id="btn-prev-recipient" class="btn btn-circle btn-secondary" title="Previous Recipient">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <div class="preview-index-container">
+                    <span class="preview-index-label">Previewing Recipient:</span>
+                    <span id="preview-current-index" class="preview-current">0</span>
+                    <span class="preview-separator">of</span>
+                    <span id="preview-total-count" class="preview-total">0</span>
+                  </div>
+                  <button id="btn-next-recipient" class="btn btn-circle btn-secondary" title="Next Recipient">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+                
+                <div class="preview-search-container">
+                  <select id="preview-recipient-dropdown" class="form-control form-control-sm">
+                    <option value="">-- Select Recipient --</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Mock Email Window Client -->
+              <div class="mock-mail-client">
+                <div class="mail-client-header">
+                  <div class="window-dot red"></div>
+                  <div class="window-dot yellow"></div>
+                  <div class="window-dot green"></div>
+                  <div class="window-title">Preview Mail Output</div>
+                </div>
+                <div class="mail-client-metadata">
+                  <div class="meta-row">
+                    <span class="meta-label">From:</span>
+                    <span id="preview-from-header" class="meta-val">Sender Name &lt;smtp-user&gt;</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">To:</span>
+                    <span id="preview-to-header" class="meta-val highlight-email">recipient@domain.com</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">Subject:</span>
+                    <span id="preview-subject-header" class="meta-val font-semibold">Subject text here</span>
+                  </div>
+                </div>
+                <div class="mail-client-body">
+                  <div id="preview-rendered-body" class="rendered-body-content">
+                    <!-- Parsed and rendered HTML/text content goes here -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: SENDING QUEUE -->
+          <div id="tab-send" class="tab-content">
+            <div class="card workspace-card">
+              <!-- Grid Stats Panel -->
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-icon bg-indigo"><i class="fa-solid fa-paper-plane"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Total Emails</span>
+                    <span id="stat-total" class="stat-number">0</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon bg-yellow"><i class="fa-solid fa-clock"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Pending</span>
+                    <span id="stat-pending" class="stat-number">0</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon bg-green"><i class="fa-solid fa-circle-check"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Successful</span>
+                    <span id="stat-success" class="stat-number">0</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon bg-red"><i class="fa-solid fa-circle-exclamation"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Failed</span>
+                    <span id="stat-failed" class="stat-number">0</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Controls and Progress -->
+              <div class="queue-controls-section">
+                <div class="progress-container">
+                  <div class="progress-bar-header">
+                    <span class="progress-status-text" id="sending-status-label">Ready to send</span>
+                    <span class="progress-percentage-text" id="sending-percentage-label">0%</span>
+                  </div>
+                  <div class="progress-bar-track">
+                    <div id="sending-progress-bar" class="progress-bar-fill" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="sending-settings-row">
+                  <div class="form-group flex-row-item">
+                    <label for="sending-delay" class="horizontal-label">
+                      Delay between emails: <span id="delay-val">1.5s</span>
+                    </label>
+                    <input type="range" id="sending-delay" min="0.1" max="10.0" step="0.1" value="1.5" class="range-slider">
+                  </div>
+                  
+                  <div class="action-buttons">
+                    <button id="btn-start-sending" class="btn btn-primary btn-lg">
+                      <i class="fa-solid fa-play"></i> Start Bulk Send
+                    </button>
+                    <button id="btn-pause-sending" class="btn btn-secondary btn-lg" disabled>
+                      <i class="fa-solid fa-pause"></i> Pause
+                    </button>
+                    <button id="btn-stop-sending" class="btn btn-danger btn-lg" disabled>
+                      <i class="fa-solid fa-stop"></i> Stop
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Queue Logs Section -->
+              <div class="queue-logs-wrapper">
+                <div class="logs-header">
+                  <h4><i class="fa-solid fa-list-check"></i> Process Logs</h4>
+                  <button id="btn-clear-logs" class="btn btn-sm btn-outline">Clear Logs</button>
+                </div>
+                <div class="logs-table-container">
+                  <table class="logs-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 80px;">Index</th>
+                        <th>Recipient Email</th>
+                        <th>Subject</th>
+                        <th style="width: 150px;">Status</th>
+                        <th style="width: 250px;">Message / Error</th>
+                      </tr>
+                    </thead>
+                    <tbody id="queue-logs-tbody">
+                      <tr class="empty-log-row">
+                        <td colspan="5" class="text-center">No send jobs run yet. Start the bulk send to generate logs.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL: SMTP Configuration -->
+  <div id="smtp-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-server"></i> SMTP Server Settings</h2>
+        <button id="btn-close-smtp" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="smtp-form">
+          <div class="form-row grid-2-col">
+            <div class="form-group">
+              <label for="smtp-host" class="required-field">SMTP Host</label>
+              <input type="text" id="smtp-host" placeholder="smtp.gmail.com" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="smtp-port" class="required-field">SMTP Port</label>
+              <input type="number" id="smtp-port" placeholder="465 or 587" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-row grid-2-col-asym">
+            <div class="form-group checkbox-group">
+              <input type="checkbox" id="smtp-secure" checked>
+              <label for="smtp-secure">Use Secure SSL/TLS Connection (recommended for port 465)</label>
+            </div>
+          </div>
+
+          <div class="form-row grid-2-col">
+            <div class="form-group">
+              <label for="smtp-user" class="required-field">SMTP Username / Email</label>
+              <input type="email" id="smtp-user" placeholder="your-email@gmail.com" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="smtp-pass" class="required-field">SMTP Password / App Password</label>
+              <div class="password-input-wrapper">
+                <input type="password" id="smtp-pass" placeholder="Your app password" class="form-control" required>
+                <button type="button" id="btn-toggle-password" class="password-toggle"><i class="fa-solid fa-eye"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="smtp-help-box">
+            <p><strong><i class="fa-solid fa-circle-info"></i> Gmail Users:</strong> You must use a 16-character <strong>App Password</strong>. Direct account passwords will be blocked by Google's security guidelines. Enable 2-step verification on your Google Account, then search for "App Passwords".</p>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="btn-test-smtp" class="btn btn-secondary">
+              <i class="fa-solid fa-vial"></i> Test & Save Connection
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i> Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Recipient Grid Data Viewer -->
+  <div id="recipients-modal" class="modal-overlay">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-table"></i> Loaded Recipient Data</h2>
+        <button id="btn-close-recipients" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body flex-column">
+        <p class="modal-desc">This is the parsed data from your CSV file. Make sure your column headers match your placeholders.</p>
+        <div class="grid-table-container">
+          <table class="grid-data-table">
+            <thead id="recipients-table-thead">
+              <!-- Generated headers -->
+            </thead>
+            <tbody id="recipients-table-tbody">
+              <!-- Generated rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="row-count-label" id="recipients-modal-count">0 rows loaded</span>
+        <button id="btn-close-recipients-footer" class="btn btn-secondary">Close Viewer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
