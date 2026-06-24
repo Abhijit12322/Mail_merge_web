@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- PapaParse for CSV Parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- SheetJS for Excel Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- Canvas Confetti for Celebration -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Custom Styling -->
@@ -54,13 +56,13 @@
             <h3><i class="fa-solid fa-users"></i> 1. Recipient List</h3>
           </div>
           <div class="card-body">
-            <!-- CSV Dropzone -->
+            <!-- CSV/Excel Dropzone -->
             <div id="csv-dropzone" class="dropzone">
-              <input type="file" id="csv-file-input" accept=".csv" class="hidden-input">
+              <input type="file" id="csv-file-input" accept=".csv, .xlsx, .xls" class="hidden-input">
               <div class="dropzone-content">
-                <i class="fa-solid fa-file-csv upload-icon"></i>
-                <p class="dropzone-text">Drag & drop CSV file here or <span class="browse-link">Browse</span></p>
-                <span class="file-hint">CSV must include an "Email" column</span>
+                <i class="fa-solid fa-file-import upload-icon"></i>
+                <p class="dropzone-text">Drag & drop CSV or Excel here or <span class="browse-link">Browse</span></p>
+                <span class="file-hint">Must include an "Email" column</span>
               </div>
             </div>
 
@@ -79,7 +81,12 @@
               </button>
             </div>
             
-            <a href="#" id="download-sample-csv" class="sample-link"><i class="fa-solid fa-download"></i> Download Sample CSV</a>
+            <div class="sample-links-container" style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 12px;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">Download Sample:</span>
+              <a href="#" id="download-sample-csv" class="sample-link" style="margin-top: 0;"><i class="fa-solid fa-file-csv"></i> CSV</a>
+              <span style="color: var(--border-color); font-size: 0.8rem;">|</span>
+              <a href="#" id="download-sample-xlsx" class="sample-link" style="margin-top: 0;"><i class="fa-solid fa-file-excel"></i> Excel</a>
+            </div>
           </div>
         </div>
 

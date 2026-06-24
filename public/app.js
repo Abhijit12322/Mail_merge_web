@@ -287,84 +287,105 @@ document.addEventListener('DOMContentLoaded', () => {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       csvFileInput.files = files;
-      handleCsvUpload(files[0]);
+      handleFileUpload(files[0]);
     }
   });
 
   csvFileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
-      handleCsvUpload(e.target.files[0]);
+      handleFileUpload(e.target.files[0]);
     }
   });
 
-  function handleCsvUpload(file) {
-    if (!file.name.endsWith('.csv')) {
-      alert('Invalid file format. Please upload a .csv file.');
+  function handleFileUpload(file) {
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    
+    if (fileExtension === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: 'greedy',
+        complete: function(results) {
+          if (results.errors.length > 0) {
+            console.warn('CSV parsing warnings:', results.errors);
+          }
+          processParsedData(results.data);
+        },
+        error: function(err) {
+          alert('Failed to parse CSV file: ' + err.message);
+        }
+      });
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+          processParsedData(jsonData);
+        } catch (err) {
+          alert('Failed to parse Excel file: ' + err.message);
+        }
+      };
+      reader.onerror = function() {
+        alert('Error reading Excel file.');
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      alert('Invalid file format. Please upload a .csv, .xlsx, or .xls file.');
+    }
+  }
+
+  function processParsedData(data) {
+    if (!data || data.length === 0) {
+      alert('The uploaded file contains no data.');
       return;
     }
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: 'greedy',
-      complete: function(results) {
-        if (results.errors.length > 0) {
-          console.warn('CSV parsing warnings:', results.errors);
+    // Validate "Email" column (case insensitive)
+    const headers = Object.keys(data[0]);
+    const emailHeader = headers.find(h => h.toLowerCase() === 'email');
+
+    if (!emailHeader) {
+      alert('Error: Recipient list must contain an "Email" column (case-insensitive).');
+      return;
+    }
+
+    // Normalize email header to standard "Email"
+    recipientsData = data.map(row => {
+      const newRow = {};
+      headers.forEach(h => {
+        if (h.toLowerCase() === 'email') {
+          newRow['Email'] = String(row[h]).trim();
+        } else {
+          newRow[h] = row[h];
         }
-
-        const data = results.data;
-        if (!data || data.length === 0) {
-          alert('The uploaded CSV file is empty.');
-          return;
-        }
-
-        // Validate "Email" column (case insensitive)
-        const headers = Object.keys(data[0]);
-        const emailHeader = headers.find(h => h.toLowerCase() === 'email');
-
-        if (!emailHeader) {
-          alert('Error: CSV file must contain an "Email" column (case-insensitive).');
-          return;
-        }
-
-        // Normalize email header to standard "Email"
-        recipientsData = data.map(row => {
-          const newRow = {};
-          headers.forEach(h => {
-            if (h.toLowerCase() === 'email') {
-              newRow['Email'] = row[h].trim();
-            } else {
-              newRow[h] = row[h];
-            }
-          });
-          return newRow;
-        });
-
-        // Store cleaned headers
-        csvHeaders = headers.filter(h => h.toLowerCase() !== 'email');
-        csvHeaders.unshift('Email'); // Always keep email first
-
-        // Update UI
-        recipientCountEl.textContent = recipientsData.length;
-        columnsCountEl.textContent = csvHeaders.length;
-        csvSummary.classList.remove('hidden');
-        
-        // Generate dynamic placeholders
-        generatePlaceholderBadges(csvHeaders);
-
-        // Populate Preview Controls
-        currentPreviewIndex = 0;
-        updatePreviewControlsDropdown();
-        updateLivePreview();
-
-        // Update queue totals
-        updateSendingStats();
-
-        alert(`Successfully imported ${recipientsData.length} recipients!`);
-      },
-      error: function(err) {
-        alert('Failed to parse CSV file: ' + err.message);
-      }
+      });
+      return newRow;
     });
+
+    // Store cleaned headers
+    csvHeaders = headers.filter(h => h.toLowerCase() !== 'email');
+    csvHeaders.unshift('Email'); // Always keep email first
+
+    // Update UI
+    recipientCountEl.textContent = recipientsData.length;
+    columnsCountEl.textContent = csvHeaders.length;
+    csvSummary.classList.remove('hidden');
+    
+    // Generate dynamic placeholders
+    generatePlaceholderBadges(csvHeaders);
+
+    // Populate Preview Controls
+    currentPreviewIndex = 0;
+    updatePreviewControlsDropdown();
+    updateLivePreview();
+
+    // Update queue totals
+    updateSendingStats();
+
+    alert(`Successfully imported ${recipientsData.length} recipients!`);
   }
 
   // Generate Clickable Placeholders
@@ -833,8 +854,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- Sample CSV file setup ---
+  // --- Sample CSV/Excel file setup ---
   function setupSampleCSVDownload() {
+    // CSV Download
     downloadSampleCsvLink.addEventListener('click', (e) => {
       e.preventDefault();
       
@@ -853,6 +875,28 @@ bruce.wayne@example.com,Bruce Wayne,Bat Cave,HERO100`;
       link.click();
       document.body.removeChild(link);
     });
+
+    // Excel Download
+    const downloadSampleXlsxLink = document.getElementById('download-sample-xlsx');
+    if (downloadSampleXlsxLink) {
+      downloadSampleXlsxLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        const data = [
+          { Email: "john.doe@example.com", Name: "John Doe", Company: "Stark Industries", PromoCode: "STARK50" },
+          { Email: "jane.smith@example.com", Name: "Jane Smith", Company: "Wayne Enterprises", PromoCode: "WAYNE20" },
+          { Email: "bruce.wayne@example.com", Name: "Bruce Wayne", Company: "Bat Cave", PromoCode: "HERO100" }
+        ];
+
+        // Create workbook using XLSX
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Recipients");
+        
+        // Write file and trigger download
+        XLSX.writeFile(workbook, "mergemail_sample_recipients.xlsx");
+      });
+    }
   }
 
 });
