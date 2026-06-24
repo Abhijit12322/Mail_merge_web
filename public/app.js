@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let csvHeaders = [];     // List of headers detected in the CSV
   let currentPreviewIndex = 0;
   let activeInputField = null; // Tracks if subject or body was focused last
+  let uploadedAttachments = {}; // Filename -> File object map
   
   // Sending state variables
   let isSending = false;
@@ -33,6 +34,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadSampleCsvLink = document.getElementById('download-sample-csv');
   const placeholdersList = document.getElementById('placeholders-list');
 
+  // Sidebar (Unique Attachments)
+  const attachmentsDropzone = document.getElementById('attachments-dropzone');
+  const attachmentsFileInput = document.getElementById('attachments-file-input');
+  const attachmentColumnSelect = document.getElementById('attachment-column-select');
+  const attachmentsSummary = document.getElementById('attachments-summary');
+  const attachmentsCount = document.getElementById('attachments-count');
+
   // Tabs
   const tabLinks = document.querySelectorAll('.tab-link');
   const tabContents = document.querySelectorAll('.tab-content');
@@ -53,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewFromHeader = document.getElementById('preview-from-header');
   const previewToHeader = document.getElementById('preview-to-header');
   const previewSubjectHeader = document.getElementById('preview-subject-header');
+  const previewAttachmentRow = document.getElementById('preview-attachment-row');
+  const previewAttachmentHeader = document.getElementById('preview-attachment-header');
   const previewRenderedBody = document.getElementById('preview-rendered-body');
 
   // Tab 3: Sending Dashboard
@@ -94,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Initial Setup & Load Cache ---
   loadSmtpSettings();
   setupSampleCSVDownload();
+  setupAttachmentsHandlers();
 
   // Track focused field for placeholder insertion
   emailSubject.addEventListener('focus', () => activeInputField = emailSubject);
@@ -377,6 +388,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Generate dynamic placeholders
     generatePlaceholderBadges(csvHeaders);
 
+    // Populate Attachment Mapping Dropdown
+    attachmentColumnSelect.innerHTML = '<option value="">-- None (No Attachments) --</option>';
+    let bestAttachmentMatch = "";
+    csvHeaders.forEach(h => {
+      const option = document.createElement('option');
+      option.value = h;
+      option.textContent = h;
+      attachmentColumnSelect.appendChild(option);
+
+      // Auto-detect a file column if one matches typical naming
+      if (/attachment|file|pdf|invoice|document|cert/i.test(h) && !bestAttachmentMatch) {
+        bestAttachmentMatch = h;
+      }
+    });
+
+    if (bestAttachmentMatch) {
+      attachmentColumnSelect.value = bestAttachmentMatch;
+    }
+
     // Populate Preview Controls
     currentPreviewIndex = 0;
     updatePreviewControlsDropdown();
@@ -503,6 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
       previewFromHeader.textContent = 'Sender Name <smtp-user>';
       previewToHeader.textContent = 'recipient@domain.com';
       previewSubjectHeader.textContent = 'Email Subject';
+      previewAttachmentRow.classList.add('hidden');
       previewRenderedBody.innerHTML = '<div style="color: #64748b; font-style: italic;">No recipients loaded. Upload a CSV to view customized previews.</div>';
       return;
     }
@@ -528,6 +559,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const bodyRendered = renderTemplate(bodyRaw, row);
 
     previewSubjectHeader.textContent = subjectRendered;
+
+    // Unique Attachment Status Render
+    const selectedAttCol = attachmentColumnSelect.value;
+    if (selectedAttCol && row[selectedAttCol]) {
+      const filename = String(row[selectedAttCol]).trim();
+      if (filename) {
+        previewAttachmentRow.classList.remove('hidden');
+        if (uploadedAttachments[filename]) {
+          previewAttachmentHeader.innerHTML = `<span style="color: var(--color-success); font-weight: 500;"><i class="fa-solid fa-circle-check"></i> ${filename} (Uploaded)</span>`;
+        } else {
+          previewAttachmentHeader.innerHTML = `<span style="color: var(--color-warning); font-weight: 500;"><i class="fa-solid fa-triangle-exclamation"></i> ${filename} (Missing Upload)</span>`;
+        }
+      } else {
+        previewAttachmentRow.classList.add('hidden');
+      }
+    } else {
+      previewAttachmentRow.classList.add('hidden');
+    }
 
     // Check if body contains HTML tags to render dynamically
     const hasHtml = /<[a-z][\s\S]*>/i.test(bodyRendered);
@@ -795,7 +844,52 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
+    // Attach unique document if mapped
+    const selectedAttCol = attachmentColumnSelect.value;
+    if (selectedAttCol && row[selectedAttCol]) {
+      const filename = String(row[selectedAttCol]).trim();
+      if (filename) {
+        const fileObj = uploadedAttachments[filename];
+        if (!fileObj) {
+          // File was listed in recipients list but not uploaded
+          failedCount++;
+          updateSendingStats();
+          updateLogRow(logRow, 'failed', `Missing attachment file: ${filename}`);
+          
+          currentQueueIndex++;
+          // Schedule next item
+          if (isSending && !isPaused) {
+            sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
+          }
+          return;
+        }
+
+        try {
+          updateLogRow(logRow, 'sending', `Reading file ${filename}...`);
+          const base64Content = await fileToBase64(fileObj);
+          emailPayload.email.attachments = [{
+            filename: fileObj.name,
+            content: base64Content,
+            contentType: fileObj.type
+          }];
+        } catch (fileErr) {
+          console.error(fileErr);
+          failedCount++;
+          updateSendingStats();
+          updateLogRow(logRow, 'failed', `Failed to read file: ${filename}`);
+          
+          currentQueueIndex++;
+          // Schedule next item
+          if (isSending && !isPaused) {
+            sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
+          }
+          return;
+        }
+      }
+    }
+
     try {
+      updateLogRow(logRow, 'sending', 'Sending email payload...');
       const response = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -897,6 +991,61 @@ bruce.wayne@example.com,Bruce Wayne,Bat Cave,HERO100`;
         XLSX.writeFile(workbook, "mergemail_sample_recipients.xlsx");
       });
     }
+  }
+
+  function setupAttachmentsHandlers() {
+    attachmentsDropzone.addEventListener('click', () => attachmentsFileInput.click());
+
+    attachmentsDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      attachmentsDropzone.classList.add('dragover');
+    });
+
+    attachmentsDropzone.addEventListener('dragleave', () => {
+      attachmentsDropzone.classList.remove('dragover');
+    });
+
+    attachmentsDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      attachmentsDropzone.classList.remove('dragover');
+      handleAttachmentsSelection(e.dataTransfer.files);
+    });
+
+    attachmentsFileInput.addEventListener('change', (e) => {
+      handleAttachmentsSelection(e.target.files);
+    });
+
+    attachmentColumnSelect.addEventListener('change', () => {
+      updateLivePreview();
+    });
+  }
+
+  function handleAttachmentsSelection(files) {
+    if (files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      // Save file object in memory indexed by its filename
+      uploadedAttachments[file.name] = file;
+    }
+
+    const fileCount = Object.keys(uploadedAttachments).length;
+    attachmentsCount.textContent = `${fileCount} file${fileCount !== 1 ? 's' : ''} uploaded`;
+    attachmentsSummary.classList.remove('hidden');
+
+    updateLivePreview();
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
   }
 
 });

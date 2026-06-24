@@ -90,10 +90,44 @@
           </div>
         </div>
 
+        <!-- Unique Attachments Card -->
+        <div class="card panel-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-paperclip"></i> 2. Unique Attachments</h3>
+          </div>
+          <div class="card-body">
+            <p class="help-text" style="margin-bottom: 8px;">Upload attachment files matching the filenames in your list:</p>
+            <!-- Attachments Dropzone -->
+            <div id="attachments-dropzone" class="dropzone" style="padding: 18px 10px;">
+              <input type="file" id="attachments-file-input" multiple class="hidden-input">
+              <div class="dropzone-content">
+                <i class="fa-solid fa-folder-open upload-icon" style="font-size: 1.5rem; margin-bottom: 6px;"></i>
+                <p class="dropzone-text" style="font-size: 0.8rem;">Drop PDF/Image files or <span class="browse-link">Browse</span></p>
+              </div>
+            </div>
+
+            <!-- Attachment Mapping Select -->
+            <div class="form-group" style="margin-top: 14px; margin-bottom: 0;">
+              <label for="attachment-column-select" style="font-size: 0.75rem;">Filename Column mapping:</label>
+              <select id="attachment-column-select" class="form-control" style="padding: 8px 12px; font-size: 0.8rem;">
+                <option value="">-- None (No Attachments) --</option>
+              </select>
+            </div>
+
+            <!-- Attachments Summary Count -->
+            <div id="attachments-summary" class="csv-summary hidden" style="margin-top: 10px; padding: 8px 10px;">
+              <div class="summary-stat" style="margin-bottom: 0;">
+                <span class="summary-label" style="font-size: 0.75rem;">Uploaded files:</span>
+                <span id="attachments-count" class="summary-value" style="font-size: 0.75rem; font-weight: 700;">0 files</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Dynamic Placeholders Card -->
         <div class="card panel-card">
           <div class="card-header">
-            <h3><i class="fa-solid fa-tags"></i> 2. Placeholders</h3>
+            <h3><i class="fa-solid fa-tags"></i> 3. Placeholders</h3>
           </div>
           <div class="card-body">
             <p class="help-text">Click a tag below to insert it at your cursor in the editor:</p>
@@ -198,6 +232,10 @@
                   <div class="meta-row">
                     <span class="meta-label">Subject:</span>
                     <span id="preview-subject-header" class="meta-val font-semibold">Subject text here</span>
+                  </div>
+                  <div id="preview-attachment-row" class="meta-row hidden">
+                    <span class="meta-label">Attach:</span>
+                    <span id="preview-attachment-header" class="meta-val"></span>
                   </div>
                 </div>
                 <div class="mail-client-body">

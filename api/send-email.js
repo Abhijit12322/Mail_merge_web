@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
   }
 
   const { host, port, secure, user, pass } = smtpConfig;
-  const { from, to, subject, html, text } = email;
+  const { from, to, subject, html, text, attachments } = email;
 
   if (!host || !port || !user || !pass) {
     return res.status(400).json({ error: 'Incomplete SMTP configuration. Host, port, user, and password are required.' });
@@ -59,6 +59,11 @@ module.exports = async (req, res) => {
       subject,
       text: text || undefined,
       html: html || undefined,
+      attachments: attachments ? attachments.map(att => ({
+        filename: att.filename,
+        content: Buffer.from(att.content, 'base64'),
+        contentType: att.contentType
+      })) : undefined
     };
 
     const info = await transporter.sendMail(mailOptions);
