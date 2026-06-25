@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { File } = require('megajs');
 
 module.exports = async (req, res) => {
   // Handle CORS
@@ -52,6 +53,47 @@ module.exports = async (req, res) => {
       socketTimeout: 15000,
     });
 
+    // Resolve attachments (base64, remote URLs, MEGA links)
+    let resolvedAttachments = undefined;
+    if (attachments && attachments.length > 0) {
+      resolvedAttachments = [];
+      for (const att of attachments) {
+        if (att.url) {
+          const isMega = att.url.toLowerCase().includes('mega.nz');
+          if (isMega) {
+            try {
+              const file = File.fromURL(att.url);
+              await file.loadAttributes();
+              const buffer = await file.downloadBuffer();
+              resolvedAttachments.push({
+                filename: file.name || att.filename || 'MEGA_Attachment',
+                content: buffer
+              });
+            } catch (megaErr) {
+              console.error('MEGA attachment download error:', megaErr);
+              return res.status(400).json({
+                success: false,
+                error: `Failed to download MEGA attachment (${att.url}): ${megaErr.message}`
+              });
+            }
+          } else {
+            // Regular URL
+            resolvedAttachments.push({
+              filename: att.filename !== 'URL_Attachment' ? att.filename : undefined,
+              path: att.url
+            });
+          }
+        } else if (att.content) {
+          // Base64 upload
+          resolvedAttachments.push({
+            filename: att.filename,
+            content: Buffer.from(att.content, 'base64'),
+            contentType: att.contentType
+          });
+        }
+      }
+    }
+
     // Send mail
     const mailOptions = {
       from: from || user,
@@ -59,11 +101,7 @@ module.exports = async (req, res) => {
       subject,
       text: text || undefined,
       html: html || undefined,
-      attachments: attachments ? attachments.map(att => ({
-        filename: att.filename,
-        content: Buffer.from(att.content, 'base64'),
-        contentType: att.contentType
-      })) : undefined
+      attachments: resolvedAttachments
     };
 
     const info = await transporter.sendMail(mailOptions);

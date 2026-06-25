@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +8,9 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- PapaParse for CSV Parsing -->
@@ -19,20 +22,21 @@
   <!-- Custom Styling -->
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
   <div class="app-container">
     <!-- Top Navigation Bar -->
     <header class="app-header">
       <div class="brand">
         <div class="logo-icon">
-          <i class="fa-solid fa-paper-plane"></i>
+          <img src="4.png" alt="IEEE Logo">
         </div>
         <div class="logo-text">
-          <h1>Merge<span>Mail</span></h1>
+          <h1>IEEE Merge<span>Mail</span></h1>
           <p>Personalized Bulk Emails Instantly</p>
         </div>
       </div>
-      
+
       <div class="header-actions">
         <div id="smtp-status" class="smtp-status-indicator unconfigured">
           <span class="status-dot"></span>
@@ -46,10 +50,10 @@
 
     <!-- Main Workspace Grid -->
     <main class="app-workspace">
-      
+
       <!-- Left Panel: Recipient Upload & Tags -->
       <aside class="sidebar-panel">
-        
+
         <!-- Recipient Card -->
         <div class="card panel-card">
           <div class="card-header">
@@ -80,12 +84,12 @@
                 <i class="fa-solid fa-table"></i> View Recipient Data
               </button>
             </div>
-            
-            <div class="sample-links-container" style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 12px;">
-              <span style="font-size: 0.8rem; color: var(--text-muted);">Download Sample:</span>
-              <a href="#" id="download-sample-csv" class="sample-link" style="margin-top: 0;"><i class="fa-solid fa-file-csv"></i> CSV</a>
-              <span style="color: var(--border-color); font-size: 0.8rem;">|</span>
-              <a href="#" id="download-sample-xlsx" class="sample-link" style="margin-top: 0;"><i class="fa-solid fa-file-excel"></i> Excel</a>
+
+            <div class="sample-links-container">
+              <span class="sample-label">Download Sample:</span>
+              <a href="#" id="download-sample-csv" class="sample-link"><i class="fa-solid fa-file-csv"></i> CSV</a>
+              <span class="sample-separator">|</span>
+              <a href="#" id="download-sample-xlsx" class="sample-link"><i class="fa-solid fa-file-excel"></i> Excel</a>
             </div>
           </div>
         </div>
@@ -108,10 +112,13 @@
             <!-- Uploaded Files List -->
             <div id="attachments-list-container" class="attachments-list-container hidden" style="margin-top: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Files (<span id="attachments-count">0</span>):</span>
-                <a href="#" id="btn-clear-attachments" style="font-size: 0.75rem; color: var(--color-danger); text-decoration: none;">Clear All</a>
+                <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Files (<span
+                    id="attachments-count">0</span>):</span>
+                <a href="#" id="btn-clear-attachments"
+                  style="font-size: 0.75rem; color: var(--color-danger); text-decoration: none;">Clear All</a>
               </div>
-              <ul id="attachments-list" style="list-style: none; display: flex; flex-direction: column; gap: 6px; padding: 0; max-height: 180px; overflow-y: auto;">
+              <ul id="attachments-list"
+                style="list-style: none; display: flex; flex-direction: column; gap: 6px; padding: 0; max-height: 180px; overflow-y: auto;">
                 <!-- Populated dynamically -->
               </ul>
             </div>
@@ -151,7 +158,7 @@
 
         <!-- Tab Content Areas -->
         <div class="tab-content-container">
-          
+
           <!-- TAB 1: COMPOSE -->
           <div id="tab-compose" class="tab-content active">
             <div class="card workspace-card">
@@ -160,10 +167,11 @@
                   <label for="email-from-name">Sender Name (Optional)</label>
                   <input type="text" id="email-from-name" placeholder="e.g. John Doe" class="form-control">
                 </div>
-                
+
                 <div class="form-group">
                   <label for="email-subject">Email Subject</label>
-                  <input type="text" id="email-subject" placeholder="Enter subject line (e.g. Hello {{Name}}!)" class="form-control font-medium">
+                  <input type="text" id="email-subject" placeholder="Enter subject line (e.g. Hello {{Name}}!)"
+                    class="form-control font-medium">
                 </div>
 
                 <div class="form-group flex-grow-1">
@@ -173,7 +181,8 @@
                       <span><i class="fa-solid fa-code"></i> HTML formatting supported</span>
                     </div>
                   </div>
-                  <textarea id="email-body" class="form-control body-textarea" placeholder="Write your email template here...&#10;&#10;Hi {{Name}},&#10;&#10;Welcome to our launch! Your registered email is {{Email}}.&#10;&#10;Best regards,&#10;The Team"></textarea>
+                  <textarea id="email-body" class="form-control body-textarea"
+                    placeholder="Write your email template here...&#10;&#10;Hi {{Name}},&#10;&#10;Welcome to our launch! Your registered email is {{Email}}.&#10;&#10;Best regards,&#10;The Team"></textarea>
                 </div>
               </div>
             </div>
@@ -198,7 +207,7 @@
                     <i class="fa-solid fa-chevron-right"></i>
                   </button>
                 </div>
-                
+
                 <div class="preview-search-container">
                   <select id="preview-recipient-dropdown" class="form-control form-control-sm">
                     <option value="">-- Select Recipient --</option>
@@ -229,7 +238,8 @@
                   </div>
                   <div class="meta-row hidden" id="preview-attachment-row">
                     <span class="meta-label">Attach:</span>
-                    <span id="preview-attachment-header" class="meta-val" style="color: var(--accent-purple); font-weight: 500; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;"></span>
+                    <span id="preview-attachment-header" class="meta-val"
+                      style="color: var(--accent-purple); font-weight: 500; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;"></span>
                   </div>
                 </div>
                 <div class="mail-client-body">
@@ -293,9 +303,10 @@
                     <label for="sending-delay" class="horizontal-label">
                       Delay between emails: <span id="delay-val">1.5s</span>
                     </label>
-                    <input type="range" id="sending-delay" min="0.1" max="10.0" step="0.1" value="1.5" class="range-slider">
+                    <input type="range" id="sending-delay" min="0.1" max="10.0" step="0.1" value="1.5"
+                      class="range-slider">
                   </div>
-                  
+
                   <div class="action-buttons">
                     <button id="btn-start-sending" class="btn btn-primary btn-lg">
                       <i class="fa-solid fa-play"></i> Start Bulk Send
@@ -329,7 +340,8 @@
                     </thead>
                     <tbody id="queue-logs-tbody">
                       <tr class="empty-log-row">
-                        <td colspan="5" class="text-center">No send jobs run yet. Start the bulk send to generate logs.</td>
+                        <td colspan="5" class="text-center">No send jobs run yet. Start the bulk send to generate logs.
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -381,13 +393,17 @@
               <label for="smtp-pass" class="required-field">SMTP Password / App Password</label>
               <div class="password-input-wrapper">
                 <input type="password" id="smtp-pass" placeholder="Your app password" class="form-control" required>
-                <button type="button" id="btn-toggle-password" class="password-toggle"><i class="fa-solid fa-eye"></i></button>
+                <button type="button" id="btn-toggle-password" class="password-toggle"><i
+                    class="fa-solid fa-eye"></i></button>
               </div>
             </div>
           </div>
 
           <div class="smtp-help-box">
-            <p><strong><i class="fa-solid fa-circle-info"></i> Gmail Users:</strong> You must use a 16-character <strong>App Password</strong>. Direct account passwords will be blocked by Google's security guidelines. Enable 2-step verification on your Google Account, then search for "App Passwords".</p>
+            <p><strong><i class="fa-solid fa-circle-info"></i> Gmail Users:</strong> You must use a 16-character
+              <strong>App Password</strong>. Direct account passwords will be blocked by Google's security guidelines.
+              Enable 2-step verification on your Google Account, then search for "App Passwords".
+            </p>
           </div>
 
           <div class="modal-actions">
@@ -411,7 +427,8 @@
         <button id="btn-close-recipients" class="modal-close-btn">&times;</button>
       </div>
       <div class="modal-body flex-column">
-        <p class="modal-desc">This is the parsed data from your CSV file. Make sure your column headers match your placeholders.</p>
+        <p class="modal-desc">This is the parsed data from your CSV file. Make sure your column headers match your
+          placeholders.</p>
         <div class="grid-table-container">
           <table class="grid-data-table">
             <thead id="recipients-table-thead">
@@ -433,4 +450,5 @@
   <!-- Custom Scripts -->
   <script src="app.js"></script>
 </body>
+
 </html>

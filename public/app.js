@@ -670,13 +670,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const filename = String(row[attachmentCol]).trim();
         previewAttachmentRow.classList.remove('hidden');
         
-        const fileExists = !!uploadedAttachments[filename];
-        if (fileExists) {
-          previewAttachmentHeader.style.color = 'var(--color-success)';
-          previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-paperclip"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Ready to send)</span>`;
+        const isUrl = filename.startsWith('http://') || filename.startsWith('https://');
+        if (isUrl) {
+          const isMega = filename.toLowerCase().includes('mega.nz');
+          if (isMega) {
+            previewAttachmentHeader.style.color = 'var(--accent-cyan)';
+            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> MEGA Attachment <span style="font-size: 0.7rem; opacity: 0.8;">(Will download and attach)</span>`;
+          } else {
+            previewAttachmentHeader.style.color = 'var(--accent-cyan)';
+            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> URL Attachment <span style="font-size: 0.7rem; opacity: 0.8;">(Will download and attach)</span>`;
+          }
         } else {
-          previewAttachmentHeader.style.color = 'var(--color-danger)';
-          previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Missing in Browser Uploads!)</span>`;
+          const fileExists = !!uploadedAttachments[filename];
+          if (fileExists) {
+            previewAttachmentHeader.style.color = 'var(--color-success)';
+            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-paperclip"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Ready to send)</span>`;
+          } else {
+            previewAttachmentHeader.style.color = 'var(--color-danger)';
+            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Missing in Browser Uploads!)</span>`;
+          }
         }
       } else {
         previewAttachmentRow.classList.add('hidden');
@@ -950,19 +962,39 @@ document.addEventListener('DOMContentLoaded', () => {
     let attachmentsPayload = null;
     if (attachmentCol && row[attachmentCol]) {
       const filename = String(row[attachmentCol]).trim();
-      const file = uploadedAttachments[filename];
-      if (file) {
-        try {
-          const base64Content = await getFileBase64(file);
-          attachmentsPayload = [{
-            filename: file.name,
-            content: base64Content,
-            contentType: file.type
-          }];
-        } catch (err) {
+      const isUrl = filename.startsWith('http://') || filename.startsWith('https://');
+
+      if (isUrl) {
+        attachmentsPayload = [{
+          filename: 'URL_Attachment',
+          url: filename
+        }];
+      } else {
+        const file = uploadedAttachments[filename];
+        if (file) {
+          try {
+            const base64Content = await getFileBase64(file);
+            attachmentsPayload = [{
+              filename: file.name,
+              content: base64Content,
+              contentType: file.type
+            }];
+          } catch (err) {
+            failedCount++;
+            if (logRow) logRow.remove(); // Remove the "sending" status log
+            logSendStatus(currentQueueIndex, row.Email, subjectRendered, 'failed', `Attachment read error: ${err.message}`);
+            currentQueueIndex++;
+            updateSendingStats();
+            if (isSending && !isPaused) {
+              sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
+            }
+            return;
+          }
+        } else {
+          // Filename specified in CSV, but file is not uploaded in the browser!
           failedCount++;
           if (logRow) logRow.remove(); // Remove the "sending" status log
-          logSendStatus(currentQueueIndex, row.Email, subjectRendered, 'failed', `Attachment read error: ${err.message}`);
+          logSendStatus(currentQueueIndex, row.Email, subjectRendered, 'failed', `Missing attachment: file '${filename}' not uploaded in browser.`);
           currentQueueIndex++;
           updateSendingStats();
           if (isSending && !isPaused) {
@@ -970,17 +1002,6 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           return;
         }
-      } else {
-        // Filename specified in CSV, but file is not uploaded in the browser!
-        failedCount++;
-        if (logRow) logRow.remove(); // Remove the "sending" status log
-        logSendStatus(currentQueueIndex, row.Email, subjectRendered, 'failed', `Missing attachment: file '${filename}' not uploaded in browser.`);
-        currentQueueIndex++;
-        updateSendingStats();
-        if (isSending && !isPaused) {
-          sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
-        }
-        return;
       }
     }
 
