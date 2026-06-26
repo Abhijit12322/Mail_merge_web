@@ -159,6 +159,18 @@ async function initDb() {
 
   console.log('Database tables verified/created successfully.');
 
+  // Cleanup sessions older than 90 days (3 months)
+  try {
+    if (isPostgres) {
+      await rawDbRun("DELETE FROM sessions WHERE login_time < CURRENT_TIMESTAMP - INTERVAL '90 days'");
+    } else {
+      await rawDbRun("DELETE FROM sessions WHERE login_time < datetime('now', '-90 days')");
+    }
+    console.log('Database cleanup: Cleared sessions older than 90 days.');
+  } catch (err) {
+    console.error('Failed to clean up old sessions:', err);
+  }
+
   // Seed default admin if no users exist
   const existingAdmin = await rawDbGet('SELECT * FROM users WHERE username = ?', ['admin']);
   if (!existingAdmin) {
