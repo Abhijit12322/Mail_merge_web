@@ -23,8 +23,8 @@ function translateQuery(query) {
   return query.replace(/\?/g, () => `$${index++}`);
 }
 
-// Promise-based DB wrappers
-const dbRun = (query, params = []) => {
+// Raw promise-based DB wrappers (used internally to avoid circular awaits during initialization)
+const rawDbRun = (query, params = []) => {
   const sql = translateQuery(query);
   if (isPostgres) {
     return pgPool.query(sql, params);
@@ -38,7 +38,7 @@ const dbRun = (query, params = []) => {
   }
 };
 
-const dbGet = (query, params = []) => {
+const rawDbGet = (query, params = []) => {
   const sql = translateQuery(query);
   if (isPostgres) {
     return pgPool.query(sql, params).then(res => res.rows[0] || null);
@@ -52,7 +52,7 @@ const dbGet = (query, params = []) => {
   }
 };
 
-const dbAll = (query, params = []) => {
+const rawDbAll = (query, params = []) => {
   const sql = translateQuery(query);
   if (isPostgres) {
     return pgPool.query(sql, params).then(res => res.rows);
@@ -66,11 +66,14 @@ const dbAll = (query, params = []) => {
   }
 };
 
+// Global initialization promise cache
+let initPromise = null;
+
 // Initialize Tables
 async function initDb() {
   if (isPostgres) {
     // Postgres Table Creation
-    await dbRun(`
+    await rawDbRun(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
@@ -80,7 +83,7 @@ async function initDb() {
       )
     `);
 
-    await dbRun(`
+    await rawDbRun(`
       CREATE TABLE IF NOT EXISTS sessions (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id),
@@ -92,7 +95,7 @@ async function initDb() {
       )
     `);
 
-    await dbRun(`
+    await rawDbRun(`
       CREATE TABLE IF NOT EXISTS pending_users (
         email VARCHAR(255) PRIMARY KEY,
         username VARCHAR(255) NOT NULL,
@@ -103,7 +106,7 @@ async function initDb() {
     `);
   } else {
     // SQLite Table Creation
-    await dbRun(`
+    await rawDbRun(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -115,14 +118,14 @@ async function initDb() {
 
     // Migrate users table if email column is missing
     try {
-      await dbRun('ALTER TABLE users ADD COLUMN email TEXT');
+      await rawDbRun('ALTER TABLE users ADD COLUMN email TEXT');
       console.log('Migrated: Added email column to users table.');
     } catch (err) {
       // Column already exists, ignore
     }
 
     // Sessions Table
-    await dbRun(`
+    await rawDbRun(`
       CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -136,7 +139,7 @@ async function initDb() {
     `);
 
     // Pending Users Table (for registration verification code)
-    await dbRun(`
+    await rawDbRun(`
       CREATE TABLE IF NOT EXISTS pending_users (
         email TEXT UNIQUE PRIMARY KEY,
         username TEXT NOT NULL,
@@ -148,7 +151,7 @@ async function initDb() {
 
     // Migrate pending_users table if username column is missing
     try {
-      await dbRun('ALTER TABLE pending_users ADD COLUMN username TEXT');
+      await rawDbRun('ALTER TABLE pending_users ADD COLUMN username TEXT');
       console.log('Migrated: Added username column to pending_users table.');
     } catch (err) {
       // Column already exists, ignore
@@ -158,15 +161,39 @@ async function initDb() {
   console.log('Database tables verified/created successfully.');
 
   // Seed default admin if no users exist
-  const existingAdmin = await dbGet('SELECT * FROM users WHERE username = ?', ['admin']);
+  const existingAdmin = await rawDbGet('SELECT * FROM users WHERE username = ?', ['admin']);
   if (!existingAdmin) {
     const defaultPassword = 'admin123';
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(defaultPassword, salt);
-    await dbRun('INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)', ['admin', hash, 'admin@localhost']);
+    await rawDbRun('INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)', ['admin', hash, 'admin@localhost']);
     console.log('Default admin user seeded successfully (admin / admin123).');
   }
 }
+
+// Wrapper to ensure DB is initialized before executing any query
+function ensureDbInitialized() {
+  if (!initPromise) {
+    initPromise = initDb();
+  }
+  return initPromise;
+}
+
+// Public promise-based DB wrappers (await initialization first)
+const dbRun = async (query, params = []) => {
+  await ensureDbInitialized();
+  return rawDbRun(query, params);
+};
+
+const dbGet = async (query, params = []) => {
+  await ensureDbInitialized();
+  return rawDbGet(query, params);
+};
+
+const dbAll = async (query, params = []) => {
+  await ensureDbInitialized();
+  return rawDbAll(query, params);
+};
 
 module.exports = {
   db: sqliteDb,
