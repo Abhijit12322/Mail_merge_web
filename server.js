@@ -254,13 +254,18 @@ app.post('/api/auth/heartbeat', async (req, res) => {
       return res.status(401).json({ error: 'Session not found or already logged out.' });
     }
     
-    // Update active time and calculate duration using SQLite date math
+    // Parse login_time as UTC
+    let loginTimeStr = session.login_time;
+    if (typeof loginTimeStr === 'string' && !loginTimeStr.endsWith('Z')) {
+      loginTimeStr = loginTimeStr.replace(' ', 'T') + 'Z';
+    }
+    const loginTime = new Date(loginTimeStr);
+    const durationSeconds = Math.round((Date.now() - loginTime.getTime()) / 1000);
+
+    // Update active time and duration in a database-agnostic way
     await dbRun(
-      `UPDATE sessions 
-       SET last_active_time = CURRENT_TIMESTAMP, 
-           duration_seconds = (strftime('%s', CURRENT_TIMESTAMP) - strftime('%s', login_time)) 
-       WHERE id = ?`,
-      [session.id]
+      'UPDATE sessions SET last_active_time = CURRENT_TIMESTAMP, duration_seconds = ? WHERE id = ?',
+      [durationSeconds, session.id]
     );
     
     return res.status(200).json({ success: true });
@@ -282,14 +287,18 @@ app.post('/api/auth/logout', async (req, res) => {
       return res.status(400).json({ error: 'Session not active or already logged out.' });
     }
     
-    // Update logout time and final duration
+    // Parse login_time as UTC
+    let loginTimeStr = session.login_time;
+    if (typeof loginTimeStr === 'string' && !loginTimeStr.endsWith('Z')) {
+      loginTimeStr = loginTimeStr.replace(' ', 'T') + 'Z';
+    }
+    const loginTime = new Date(loginTimeStr);
+    const durationSeconds = Math.round((Date.now() - loginTime.getTime()) / 1000);
+
+    // Update logout time and final duration in a database-agnostic way
     await dbRun(
-      `UPDATE sessions 
-       SET logout_time = CURRENT_TIMESTAMP, 
-           last_active_time = CURRENT_TIMESTAMP, 
-           duration_seconds = (strftime('%s', CURRENT_TIMESTAMP) - strftime('%s', login_time)) 
-       WHERE id = ?`,
-      [session.id]
+      'UPDATE sessions SET logout_time = CURRENT_TIMESTAMP, last_active_time = CURRENT_TIMESTAMP, duration_seconds = ? WHERE id = ?',
+      [durationSeconds, session.id]
     );
     
     return res.status(200).json({ success: true, message: 'Logged out successfully.' });
@@ -308,9 +317,13 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`==================================================`);
-  console.log(`  Merge Email Server is running on port ${PORT}`);
-  console.log(`  Local URL: http://localhost:${PORT}`);
-  console.log(`==================================================`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`==================================================`);
+    console.log(`  Merge Email Server is running on port ${PORT}`);
+    console.log(`  Local URL: http://localhost:${PORT}`);
+    console.log(`==================================================`);
+  });
+}
+
+module.exports = app;
