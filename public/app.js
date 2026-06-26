@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentPreviewIndex = 0;
   let activeInputField = null; // Tracks if subject or body was focused last
   let uploadedAttachments = {}; // Map of filename -> File object
+  let authToken = localStorage.getItem('merge_mail_token') || null;
+  let heartbeatInterval = null;
   
   // Sending state variables
   let isSending = false;
@@ -20,9 +22,42 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentDelay = 1.5; // Seconds
 
   // --- Element Selectors ---
-  // Header
-  const smtpStatusIndicator = document.getElementById('smtp-status');
-  const btnOpenSmtp = document.getElementById('btn-open-smtp');
+  // Header / Auth
+  const loginScreen = document.getElementById('login-screen');
+  const userDisplay = document.getElementById('user-display');
+  const btnLogout = document.getElementById('btn-logout');
+
+  // Auth Views
+  const loginView = document.getElementById('login-view');
+  const signupView = document.getElementById('signup-view');
+  const verifyView = document.getElementById('verify-view');
+
+  // Login Form Selectors
+  const loginForm = document.getElementById('login-form');
+  const loginUsernameInput = document.getElementById('login-username');
+  const loginPasswordInput = document.getElementById('login-password');
+  const loginError = document.getElementById('login-error');
+  const loginErrorText = document.getElementById('login-error-text');
+
+  // Signup Form Selectors
+  const signupForm = document.getElementById('signup-form');
+  const signupUsernameInput = document.getElementById('signup-username');
+  const signupEmailInput = document.getElementById('signup-email');
+  const signupPasswordInput = document.getElementById('signup-password');
+  const signupError = document.getElementById('signup-error');
+  const signupErrorText = document.getElementById('signup-error-text');
+
+  // Verify Form Selectors
+  const verifyForm = document.getElementById('verify-form');
+  const verifyCodeInput = document.getElementById('verify-code');
+  const verifyError = document.getElementById('verify-error');
+  const verifyErrorText = document.getElementById('verify-error-text');
+  const verifyEmailDisplay = document.getElementById('verify-email-display');
+
+  // Toggle Links
+  const linkGotoSignup = document.getElementById('link-goto-signup');
+  const linkGotoLogin = document.getElementById('link-goto-login');
+  const linkBackToSignup = document.getElementById('link-back-to-signup');
   
   // Sidebar (Recipients & Placeholders)
   const csvDropzone = document.getElementById('csv-dropzone');
@@ -80,19 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const queueLogsTbody = document.getElementById('queue-logs-tbody');
   const btnClearLogs = document.getElementById('btn-clear-logs');
 
-  // Modals
-  const smtpModal = document.getElementById('smtp-modal');
-  const smtpForm = document.getElementById('smtp-form');
-  const btnCloseSmtp = document.getElementById('btn-close-smtp');
-  const btnTestSmtp = document.getElementById('btn-test-smtp');
-  const btnTogglePassword = document.getElementById('btn-toggle-password');
-  
-  const smtpHostInput = document.getElementById('smtp-host');
-  const smtpPortInput = document.getElementById('smtp-port');
-  const smtpSecureCheckbox = document.getElementById('smtp-secure');
-  const smtpUserInput = document.getElementById('smtp-user');
-  const smtpPassInput = document.getElementById('smtp-pass');
-
   const recipientsModal = document.getElementById('recipients-modal');
   const btnCloseRecipients = document.getElementById('btn-close-recipients');
   const btnCloseRecipientsFooter = document.getElementById('btn-close-recipients-footer');
@@ -101,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const recipientsModalCount = document.getElementById('recipients-modal-count');
 
   // --- Initial Setup & Load Cache ---
-  loadSmtpSettings();
+  checkSession();
   setupSampleCSVDownload();
 
   // Track focused field for placeholder insertion
@@ -152,130 +174,264 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeModal(modal) {
     modal.classList.remove('open');
   }
-
-  btnOpenSmtp.addEventListener('click', () => openModal(smtpModal));
-  btnCloseSmtp.addEventListener('click', () => closeModal(smtpModal));
   
   // Close modals on clicking outside card
   window.addEventListener('click', (e) => {
-    if (e.target === smtpModal) closeModal(smtpModal);
     if (e.target === recipientsModal) closeModal(recipientsModal);
   });
 
-  // Toggle Password Visibility
-  btnTogglePassword.addEventListener('click', () => {
-    const type = smtpPassInput.getAttribute('type') === 'password' ? 'text' : 'password';
-    smtpPassInput.setAttribute('type', type);
-    const icon = btnTogglePassword.querySelector('i');
-    icon.classList.toggle('fa-eye');
-    icon.classList.toggle('fa-eye-slash');
-  });
-
-  // --- SMTP Configurations Settings ---
-  function getSmtpSettings() {
-    return {
-      host: smtpHostInput.value.trim(),
-      port: smtpPortInput.value.trim(),
-      secure: smtpSecureCheckbox.checked,
-      user: smtpUserInput.value.trim(),
-      pass: smtpPassInput.value.trim()
-    };
-  }
-
-  function saveSmtpSettings(settings) {
-    localStorage.setItem('merge_mail_smtp_settings', JSON.stringify(settings));
-    updateSmtpStatusIndicator(true);
-  }
-
-  function loadSmtpSettings() {
-    const cached = localStorage.getItem('merge_mail_smtp_settings');
-    if (cached) {
-      try {
-        const settings = JSON.parse(cached);
-        smtpHostInput.value = settings.host || '';
-        smtpPortInput.value = settings.port || '';
-        smtpSecureCheckbox.checked = settings.secure !== false;
-        smtpUserInput.value = settings.user || '';
-        smtpPassInput.value = settings.pass || '';
-        updateSmtpStatusIndicator(true);
-      } catch (e) {
-        console.error('Failed to parse cached SMTP settings', e);
-        updateSmtpStatusIndicator(false);
-      }
+  // --- Authentication System ---
+  function showLogin(show) {
+    if (show) {
+      loginScreen.classList.remove('hidden');
+      loginView.classList.remove('hidden');
+      signupView.classList.add('hidden');
+      verifyView.classList.add('hidden');
+      
+      // Clear errors
+      loginError.classList.add('hidden');
+      signupError.classList.add('hidden');
+      verifyError.classList.add('hidden');
+      
+      loginUsernameInput.focus();
     } else {
-      updateSmtpStatusIndicator(false);
+      loginScreen.classList.add('hidden');
     }
   }
 
-  function updateSmtpStatusIndicator(isConfigured) {
-    if (isConfigured) {
-      smtpStatusIndicator.className = "smtp-status-indicator configured";
-      smtpStatusIndicator.querySelector('.status-text').textContent = "SMTP Configured";
-    } else {
-      smtpStatusIndicator.className = "smtp-status-indicator unconfigured";
-      smtpStatusIndicator.querySelector('.status-text').textContent = "SMTP Not Configured";
-    }
-  }
-
-  // SMTP Settings Submission
-  smtpForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const settings = getSmtpSettings();
-    saveSmtpSettings(settings);
-    closeModal(smtpModal);
-    alert('SMTP Settings Saved Successfully!');
-  });
-
-  // Test SMTP Settings
-  btnTestSmtp.addEventListener('click', async () => {
-    const settings = getSmtpSettings();
-    if (!settings.host || !settings.port || !settings.user || !settings.pass) {
-      alert('Please fill out all SMTP fields to test the connection.');
+  async function checkSession() {
+    if (!authToken) {
+      showLogin(true);
       return;
     }
-
-    btnTestSmtp.disabled = true;
-    btnTestSmtp.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing Connection...';
-
-    // Test email options (sending a test email to oneself)
-    const testPayload = {
-      smtpConfig: settings,
-      email: {
-        from: settings.user,
-        to: settings.user,
-        subject: 'MergeMail Connection Test',
-        html: `
-          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 500px;">
-            <h2 style="color: #6366f1; margin-top: 0;">Connection Successful!</h2>
-            <p>Your SMTP configurations on MergeMail are correct and active.</p>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-            <small style="color: #64748b;">Sent via local email merge helper.</small>
-          </div>
-        `
-      }
-    };
-
     try {
-      const response = await fetch('/api/send-email', {
+      const response = await fetch('/api/auth/session-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testPayload)
+        body: JSON.stringify({ token: authToken })
       });
       const data = await response.json();
-
       if (response.ok && data.success) {
-        saveSmtpSettings(settings);
-        alert('Success! A test email has been successfully sent to: ' + settings.user);
+        userDisplay.textContent = data.username;
+        showLogin(false);
+        startHeartbeat();
       } else {
-        alert('Connection Failed: ' + (data.error || 'Check details and try again.'));
+        // Token invalid/expired
+        authToken = null;
+        localStorage.removeItem('merge_mail_token');
+        showLogin(true);
+      }
+    } catch (err) {
+      console.error('Session check failed:', err);
+      if (!authToken) showLogin(true);
+    }
+  }
+
+  function startHeartbeat() {
+    stopHeartbeat();
+    sendHeartbeat();
+    // Heartbeat every 30 seconds
+    heartbeatInterval = setInterval(sendHeartbeat, 30000);
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+  }
+
+  async function sendHeartbeat() {
+    if (!authToken) return;
+    try {
+      await fetch('/api/auth/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: authToken })
+      });
+    } catch (err) {
+      console.error('Heartbeat ping failed:', err);
+    }
+  }
+
+  // Handle Login submission
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = loginUsernameInput.value.trim();
+    const password = loginPasswordInput.value;
+    
+    loginError.classList.add('hidden');
+    
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        authToken = data.token;
+        localStorage.setItem('merge_mail_token', data.token);
+        userDisplay.textContent = data.username;
+        
+        loginUsernameInput.value = '';
+        loginPasswordInput.value = '';
+        
+        showLogin(false);
+        startHeartbeat();
+      } else {
+        loginErrorText.textContent = data.error || 'Invalid credentials.';
+        loginError.classList.remove('hidden');
       }
     } catch (err) {
       console.error(err);
-      alert('Error testing SMTP connection: Could not reach backend server.');
-    } finally {
-      btnTestSmtp.disabled = false;
-      btnTestSmtp.innerHTML = '<i class="fa-solid fa-vial"></i> Test & Save Connection';
+      loginErrorText.textContent = 'Server connection failed.';
+      loginError.classList.remove('hidden');
     }
+  });
+
+  // Toggle Links Event Listeners
+  linkGotoSignup.addEventListener('click', (e) => {
+    e.preventDefault();
+    loginView.classList.add('hidden');
+    verifyView.classList.add('hidden');
+    signupView.classList.remove('hidden');
+    
+    // Clear errors
+    signupError.classList.add('hidden');
+    signupEmailInput.focus();
+  });
+
+  linkGotoLogin.addEventListener('click', (e) => {
+    e.preventDefault();
+    signupView.classList.add('hidden');
+    verifyView.classList.add('hidden');
+    loginView.classList.remove('hidden');
+    
+    // Clear errors
+    loginError.classList.add('hidden');
+    loginUsernameInput.focus();
+  });
+
+  linkBackToSignup.addEventListener('click', (e) => {
+    e.preventDefault();
+    loginView.classList.add('hidden');
+    verifyView.classList.add('hidden');
+    signupView.classList.remove('hidden');
+    
+    // Clear errors
+    signupError.classList.add('hidden');
+    signupEmailInput.focus();
+  });
+
+  // Handle Signup Start Submission
+  signupForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = signupUsernameInput.value.trim();
+    const email = signupEmailInput.value.trim();
+    const password = signupPasswordInput.value;
+    
+    signupError.classList.add('hidden');
+    
+    // Disable submit button during request
+    const submitBtn = signupForm.querySelector('button[type="submit"]');
+    const originalBtnHTML = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending Code...';
+    
+    try {
+      const response = await fetch('/api/auth/signup-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        verifyEmailDisplay.textContent = email;
+        signupView.classList.add('hidden');
+        verifyView.classList.remove('hidden');
+        
+        verifyCodeInput.value = '';
+        verifyCodeInput.focus();
+      } else {
+        signupErrorText.textContent = data.error || 'Failed to start registration.';
+        signupError.classList.remove('hidden');
+      }
+    } catch (err) {
+      console.error(err);
+      signupErrorText.textContent = 'Server connection failed.';
+      signupError.classList.remove('hidden');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnHTML;
+    }
+  });
+
+  // Handle Signup Verification Submission
+  verifyForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = signupEmailInput.value.trim();
+    const code = verifyCodeInput.value.trim();
+    
+    verifyError.classList.add('hidden');
+    
+    const submitBtn = verifyForm.querySelector('button[type="submit"]');
+    const originalBtnHTML = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+    
+    try {
+      const response = await fetch('/api/auth/signup-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        authToken = data.token;
+        localStorage.setItem('merge_mail_token', data.token);
+        userDisplay.textContent = data.username;
+        
+        // Reset forms
+        signupUsernameInput.value = '';
+        signupEmailInput.value = '';
+        signupPasswordInput.value = '';
+        verifyCodeInput.value = '';
+        
+        showLogin(false);
+        startHeartbeat();
+      } else {
+        verifyErrorText.textContent = data.error || 'Invalid or expired verification code.';
+        verifyError.classList.remove('hidden');
+      }
+    } catch (err) {
+      console.error(err);
+      verifyErrorText.textContent = 'Server connection failed.';
+      verifyError.classList.remove('hidden');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnHTML;
+    }
+  });
+
+  // Handle Logout
+  btnLogout.addEventListener('click', async () => {
+    stopHeartbeat();
+    if (authToken) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: authToken })
+        });
+      } catch (err) {
+        console.error('Logout request failed:', err);
+      }
+    }
+    authToken = null;
+    localStorage.removeItem('merge_mail_token');
+    userDisplay.textContent = '';
+    showLogin(true);
   });
 
   // --- CSV parsing & Dropzone handlers ---
@@ -631,12 +787,9 @@ document.addEventListener('DOMContentLoaded', () => {
     previewRecipientDropdown.value = currentPreviewIndex;
 
     const row = recipientsData[currentPreviewIndex];
-    const smtpSettings = getSmtpSettings();
-    
     // Headers
     const fromName = emailFromName.value.trim();
-    const fromUser = smtpSettings.user || 'sender@example.com';
-    previewFromHeader.textContent = fromName ? `${fromName} <${fromUser}>` : fromUser;
+    previewFromHeader.textContent = fromName ? `${fromName} <configured-smtp-email>` : 'configured-smtp-email';
     previewToHeader.textContent = `${row.Email} ${row.Name ? `(${row.Name})` : ''}`;
     
     // Subject and Body interpolations
@@ -801,14 +954,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Send Bulk Email Process Starter
   btnStartSending.addEventListener('click', async () => {
-    // Validation
-    const smtpSettings = getSmtpSettings();
-    if (!smtpSettings.host || !smtpSettings.user || !smtpSettings.pass) {
-      alert('Please configure your SMTP Settings before sending emails.');
-      openModal(smtpModal);
-      return;
-    }
-
     if (recipientsData.length === 0) {
       alert('Please upload a CSV file with your recipient list first.');
       switchTab('tab-compose');
@@ -1007,9 +1152,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Prepare payload
     const emailPayload = {
-      smtpConfig: smtpSettings,
       email: {
-        from: fromName ? `${fromName} <${smtpSettings.user}>` : smtpSettings.user,
+        from: fromName || undefined,
         to: row.Email,
         subject: subjectRendered,
         html: /<[a-z][\s\S]*>/i.test(bodyRendered) ? bodyRendered : undefined,

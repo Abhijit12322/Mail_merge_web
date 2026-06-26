@@ -20,17 +20,23 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { smtpConfig, email } = req.body;
+  const { email } = req.body;
 
-  if (!smtpConfig || !email) {
-    return res.status(400).json({ error: 'Missing SMTP configuration or email details.' });
+  if (!email) {
+    return res.status(400).json({ error: 'Missing email details.' });
   }
 
-  const { host, port, secure, user, pass } = smtpConfig;
+  // Load SMTP configurations internally from environment variables
+  const host = process.env.SMTP_HOST;
+  const port = process.env.SMTP_PORT;
+  const secure = process.env.SMTP_SECURE === 'true' || process.env.SMTP_SECURE === true;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
   const { from, to, subject, html, text, attachments } = email;
 
   if (!host || !port || !user || !pass) {
-    return res.status(400).json({ error: 'Incomplete SMTP configuration. Host, port, user, and password are required.' });
+    return res.status(500).json({ error: 'Server configuration error: Incomplete internal SMTP setup on server.' });
   }
 
   if (!to || !subject || (!html && !text)) {
@@ -94,9 +100,11 @@ module.exports = async (req, res) => {
       }
     }
 
+    const finalFrom = (from && from.includes('@')) ? from : (from ? `${from} <${user}>` : user);
+
     // Send mail
     const mailOptions = {
-      from: from || user,
+      from: finalFrom,
       to,
       subject,
       text: text || undefined,

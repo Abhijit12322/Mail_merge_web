@@ -38,12 +38,9 @@
       </div>
 
       <div class="header-actions">
-        <div id="smtp-status" class="smtp-status-indicator unconfigured">
-          <span class="status-dot"></span>
-          <span class="status-text">SMTP Not Configured</span>
-        </div>
-        <button id="btn-open-smtp" class="btn btn-secondary">
-          <i class="fa-solid fa-gear"></i> SMTP Settings
+        <span id="user-display" class="user-display-text"></span>
+        <button id="btn-logout" class="btn btn-secondary">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
         </button>
       </div>
     </header>
@@ -357,65 +354,102 @@
     </main>
   </div>
 
-  <!-- MODAL: SMTP Configuration -->
-  <div id="smtp-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2><i class="fa-solid fa-server"></i> SMTP Server Settings</h2>
-        <button id="btn-close-smtp" class="modal-close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <form id="smtp-form">
-          <div class="form-row grid-2-col">
-            <div class="form-group">
-              <label for="smtp-host" class="required-field">SMTP Host</label>
-              <input type="text" id="smtp-host" placeholder="smtp.gmail.com" class="form-control" required>
-            </div>
-            <div class="form-group">
-              <label for="smtp-port" class="required-field">SMTP Port</label>
-              <input type="number" id="smtp-port" placeholder="465 or 587" class="form-control" required>
-            </div>
+  <!-- Login Screen Overlay -->
+  <div id="login-screen" class="login-overlay">
+    <div class="login-card">
+      
+      <!-- 1. LOGIN VIEW -->
+      <div id="login-view">
+        <div class="login-header">
+          <div class="logo-icon" style="margin: 0 auto 15px auto;">
+            <img src="4.png" alt="IEEE Logo">
           </div>
-
-          <div class="form-row grid-2-col-asym">
-            <div class="form-group checkbox-group">
-              <input type="checkbox" id="smtp-secure" checked>
-              <label for="smtp-secure">Use Secure SSL/TLS Connection (recommended for port 465)</label>
-            </div>
+          <h2>IEEE Merge<span>Mail</span> Login</h2>
+          <p>Enter your credentials to access the bulk mail helper</p>
+        </div>
+        <form id="login-form">
+          <div class="form-group">
+            <label for="login-username">Username or Email</label>
+            <input type="text" id="login-username" placeholder="Enter username/email" class="form-control" required autocomplete="username">
           </div>
-
-          <div class="form-row grid-2-col">
-            <div class="form-group">
-              <label for="smtp-user" class="required-field">SMTP Username / Email</label>
-              <input type="email" id="smtp-user" placeholder="your-email@gmail.com" class="form-control" required>
-            </div>
-            <div class="form-group">
-              <label for="smtp-pass" class="required-field">SMTP Password / App Password</label>
-              <div class="password-input-wrapper">
-                <input type="password" id="smtp-pass" placeholder="Your app password" class="form-control" required>
-                <button type="button" id="btn-toggle-password" class="password-toggle"><i
-                    class="fa-solid fa-eye"></i></button>
-              </div>
-            </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" placeholder="Enter password" class="form-control" required autocomplete="current-password">
           </div>
-
-          <div class="smtp-help-box">
-            <p><strong><i class="fa-solid fa-circle-info"></i> Gmail Users:</strong> You must use a 16-character
-              <strong>App Password</strong>. Direct account passwords will be blocked by Google's security guidelines.
-              Enable 2-step verification on your Google Account, then search for "App Passwords".
-            </p>
+          <div id="login-error" class="login-error-message hidden">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="login-error-text">Invalid username or password.</span>
           </div>
-
-          <div class="modal-actions">
-            <button type="button" id="btn-test-smtp" class="btn btn-secondary">
-              <i class="fa-solid fa-vial"></i> Test & Save Connection
-            </button>
-            <button type="submit" class="btn btn-primary">
-              <i class="fa-solid fa-floppy-disk"></i> Save Settings
-            </button>
-          </div>
+          <button type="submit" class="btn btn-primary btn-full-width btn-lg" style="margin-top: 10px;">
+            <i class="fa-solid fa-right-to-bracket"></i> Login
+          </button>
         </form>
+        <div style="text-align: center; margin-top: 20px; font-size: 0.85rem;">
+          <span style="color: var(--text-secondary);">Don't have an account?</span> 
+          <a href="#" id="link-goto-signup" style="color: var(--primary); text-decoration: none; font-weight: 600; margin-left: 5px;">Sign Up</a>
+        </div>
       </div>
+
+      <!-- 2. SIGNUP VIEW -->
+      <div id="signup-view" class="hidden">
+        <div class="login-header">
+          <div class="logo-icon" style="margin: 0 auto 15px auto;">
+            <img src="4.png" alt="IEEE Logo">
+          </div>
+          <h2>IEEE Merge<span>Mail</span> Sign Up</h2>
+          <p>Create an account to start sending bulk emails</p>
+        </div>
+        <form id="signup-form">
+          <div class="form-group">
+            <label for="signup-username">Username</label>
+            <input type="text" id="signup-username" placeholder="Enter username" class="form-control" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label for="signup-email">Gmail Address</label>
+            <input type="email" id="signup-email" placeholder="your-email@gmail.com" class="form-control" required autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="signup-password">Password</label>
+            <input type="password" id="signup-password" placeholder="Create secure password" class="form-control" required autocomplete="new-password">
+          </div>
+          <div id="signup-error" class="login-error-message hidden">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="signup-error-text">Failed to register.</span>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full-width btn-lg" style="margin-top: 10px;">
+            <i class="fa-solid fa-paper-plane"></i> Send Verification Code
+          </button>
+        </form>
+        <div style="text-align: center; margin-top: 20px; font-size: 0.85rem;">
+          <span style="color: var(--text-secondary);">Already have an account?</span> 
+          <a href="#" id="link-goto-login" style="color: var(--primary); text-decoration: none; font-weight: 600; margin-left: 5px;">Sign In</a>
+        </div>
+      </div>
+
+      <!-- 3. VERIFY VIEW -->
+      <div id="verify-view" class="hidden">
+        <div class="login-header">
+          <div class="logo-icon" style="margin: 0 auto 15px auto;">
+            <img src="4.png" alt="IEEE Logo">
+          </div>
+          <h2>Verify Account</h2>
+          <p>We've sent a 6-digit verification code to <strong id="verify-email-display" style="color: var(--text-primary);"></strong>. Enter it below to activate your account.</p>
+        </div>
+        <form id="verify-form">
+          <div class="form-group">
+            <label for="verify-code" style="text-align: center; display: block; margin-bottom: 10px;">Verification Code</label>
+            <input type="text" id="verify-code" maxlength="6" placeholder="000000" class="form-control" required style="font-size: 1.8rem; font-weight: 700; text-align: center; letter-spacing: 12px; padding: 10px 0; max-width: 240px; margin: 0 auto;" autocomplete="one-time-code">
+          </div>
+          <div id="verify-error" class="login-error-message hidden">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="verify-error-text">Invalid or expired code.</span>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full-width btn-lg" style="margin-top: 20px;">
+            <i class="fa-solid fa-circle-check"></i> Verify & Activate
+          </button>
+        </form>
+        <div style="text-align: center; margin-top: 20px; font-size: 0.85rem;">
+          <a href="#" id="link-back-to-signup" style="color: var(--text-secondary); text-decoration: none;"><i class="fa-solid fa-arrow-left"></i> Back to Sign Up</a>
+        </div>
+      </div>
+
     </div>
   </div>
 
