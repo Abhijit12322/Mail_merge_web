@@ -1085,7 +1085,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const row = recipientsData[currentQueueIndex];
-    const smtpSettings = getSmtpSettings();
     const fromName = emailFromName.value.trim();
     
     // Interpolate template for current recipient
