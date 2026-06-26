@@ -1,12 +1,11 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const { Pool } = require('pg');
-
 let pgPool = null;
 const isPostgres = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
 
 if (isPostgres) {
+  const { Pool } = require('pg');
   pgPool = new Pool({
     connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
