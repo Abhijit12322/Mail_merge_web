@@ -91,11 +91,15 @@ module.exports = async (req, res) => {
           }
         } else if (att.content) {
           // Base64 upload
-          resolvedAttachments.push({
+          const resolvedAtt = {
             filename: att.filename,
             content: Buffer.from(att.content, 'base64'),
             contentType: att.contentType
-          });
+          };
+          if (att.cid) {
+            resolvedAtt.cid = att.cid;
+          }
+          resolvedAttachments.push(resolvedAtt);
         }
       }
     }

@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentPreviewIndex = 0;
   let activeInputField = null; // Tracks if subject or body was focused last
   let uploadedAttachments = {}; // Map of filename -> File object
+  let inlineImages = {}; // key: cid, value: { filename, content (base64), contentType }
+  let pendingImageFile = null;
+  let activeImageModalTab = 'local'; // 'local' or 'url'
   let authToken = localStorage.getItem('merge_mail_token') || null;
   let heartbeatInterval = null;
   
@@ -121,6 +124,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const recipientsTableThead = document.getElementById('recipients-table-thead');
   const recipientsTableTbody = document.getElementById('recipients-table-tbody');
   const recipientsModalCount = document.getElementById('recipients-modal-count');
+
+  // Inline Images element selectors
+  const btnInsertImage = document.getElementById('btn-insert-image');
+  const btnSidebarAddImage = document.getElementById('btn-sidebar-add-image');
+  const imageModal = document.getElementById('image-modal');
+  const btnCloseImageModal = document.getElementById('btn-close-image-modal');
+  const btnCancelImageModal = document.getElementById('btn-cancel-image-modal');
+  const tabBtnLocalImage = document.getElementById('tab-btn-local-image');
+  const tabBtnUrlImage = document.getElementById('tab-btn-url-image');
+  const modalSecLocal = document.getElementById('modal-sec-local');
+  const modalSecUrl = document.getElementById('modal-sec-url');
+  const imageFileInput = document.getElementById('image-file-input');
+  const imageDropzone = document.getElementById('image-dropzone');
+  const imageUploadPreviewContainer = document.getElementById('image-upload-preview-container');
+  const imageUploadPreview = document.getElementById('image-upload-preview');
+  const imageUploadFilename = document.getElementById('image-upload-filename');
+  const imageCidInput = document.getElementById('image-cid-input');
+  const imageUrlInput = document.getElementById('image-url-input');
+  const imageAltInput = document.getElementById('image-alt-input');
+  const btnInsertImageSubmit = document.getElementById('btn-insert-image-submit');
+  const inlineImagesListContainer = document.getElementById('inline-images-list-container');
+  const inlineImagesList = document.getElementById('inline-images-list');
 
   // --- Initial Setup & Load Cache ---
   checkSession();
@@ -569,6 +594,227 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // --- Inline Image Helper Functions & Event Listeners ---
+  btnInsertImage.addEventListener('click', () => openImageModal());
+  btnSidebarAddImage.addEventListener('click', () => openImageModal());
+
+  btnCloseImageModal.addEventListener('click', () => closeImageModal());
+  btnCancelImageModal.addEventListener('click', () => closeImageModal());
+  window.addEventListener('click', (e) => {
+    if (e.target === imageModal) closeImageModal();
+  });
+
+  function openImageModal() {
+    resetImageModal();
+    openModal(imageModal);
+  }
+
+  function closeImageModal() {
+    closeModal(imageModal);
+  }
+
+  function resetImageModal() {
+    pendingImageFile = null;
+    imageFileInput.value = '';
+    imageUploadPreviewContainer.classList.add('hidden');
+    imageUploadPreview.src = '';
+    imageUploadFilename.textContent = '';
+    imageCidInput.value = '';
+    imageUrlInput.value = '';
+    imageAltInput.value = '';
+    setImageModalTab('local');
+  }
+
+  function setImageModalTab(tab) {
+    activeImageModalTab = tab;
+    if (tab === 'local') {
+      tabBtnLocalImage.classList.add('btn-primary');
+      tabBtnLocalImage.classList.remove('btn-secondary');
+      tabBtnUrlImage.classList.add('btn-secondary');
+      tabBtnUrlImage.classList.remove('btn-primary');
+      modalSecLocal.classList.remove('hidden');
+      modalSecUrl.classList.add('hidden');
+    } else {
+      tabBtnUrlImage.classList.add('btn-primary');
+      tabBtnUrlImage.classList.remove('btn-secondary');
+      tabBtnLocalImage.classList.add('btn-secondary');
+      tabBtnLocalImage.classList.remove('btn-primary');
+      modalSecUrl.classList.remove('hidden');
+      modalSecLocal.classList.add('hidden');
+    }
+  }
+
+  tabBtnLocalImage.addEventListener('click', () => setImageModalTab('local'));
+  tabBtnUrlImage.addEventListener('click', () => setImageModalTab('url'));
+
+  imageDropzone.addEventListener('click', () => imageFileInput.click());
+
+  imageDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    imageDropzone.classList.add('dragover');
+  });
+
+  imageDropzone.addEventListener('dragleave', () => {
+    imageDropzone.classList.remove('dragover');
+  });
+
+  imageDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    imageDropzone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+      handleImageSelection(files[0]);
+    }
+  });
+
+  imageFileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      handleImageSelection(e.target.files[0]);
+    }
+  });
+
+  function handleImageSelection(file) {
+    pendingImageFile = file;
+    imageUploadFilename.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
+    
+    const cleanName = file.name
+      .split('.')[0]
+      .replace(/[^a-zA-Z0-9_]/g, '_')
+      .toLowerCase();
+    
+    let candidateCid = cleanName || 'image';
+    let suffix = 1;
+    while (inlineImages[candidateCid]) {
+      candidateCid = `${cleanName}_${suffix}`;
+      suffix++;
+    }
+    imageCidInput.value = candidateCid;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imageUploadPreview.src = e.target.result;
+      imageUploadPreviewContainer.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  btnInsertImageSubmit.addEventListener('click', async () => {
+    if (activeImageModalTab === 'local') {
+      if (!pendingImageFile) {
+        alert('Please upload or drag an image first.');
+        return;
+      }
+      
+      const cid = imageCidInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+      if (!cid) {
+        alert('Please enter a valid Image ID.');
+        return;
+      }
+
+      try {
+        const base64Content = await getFileBase64(pendingImageFile);
+        inlineImages[cid] = {
+          filename: pendingImageFile.name,
+          content: base64Content,
+          contentType: pendingImageFile.type
+        };
+
+        insertHtmlAtCursor(emailBody, `<img src="cid:${cid}" style="max-width: 100%; height: auto;" />`);
+        renderInlineImagesList();
+        closeImageModal();
+      } catch (err) {
+        alert(`Failed to process image: ${err.message}`);
+      }
+    } else {
+      const url = imageUrlInput.value.trim();
+      if (!url) {
+        alert('Please enter a valid image URL.');
+        return;
+      }
+      const alt = imageAltInput.value.trim();
+      const altAttr = alt ? ` alt="${alt}"` : '';
+
+      insertHtmlAtCursor(emailBody, `<img src="${url}"${altAttr} style="max-width: 100%; height: auto;" />`);
+      closeImageModal();
+    }
+  });
+
+  function insertHtmlAtCursor(textarea, htmlText) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const originalValue = textarea.value;
+    textarea.value = originalValue.substring(0, start) + htmlText + originalValue.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + htmlText.length;
+    textarea.focus();
+    updateLivePreview();
+  }
+
+  function renderInlineImagesList() {
+    inlineImagesList.innerHTML = '';
+    const cids = Object.keys(inlineImages);
+    
+    if (cids.length > 0) {
+      inlineImagesListContainer.classList.remove('hidden');
+      cids.forEach(cid => {
+        const img = inlineImages[cid];
+        const li = document.createElement('li');
+        li.className = 'inline-image-item';
+        
+        const thumb = document.createElement('img');
+        thumb.className = 'inline-image-thumb';
+        thumb.src = `data:${img.contentType};base64,${img.content}`;
+        
+        const info = document.createElement('div');
+        info.className = 'inline-image-info';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'inline-image-name';
+        nameSpan.textContent = img.filename;
+        
+        const cidSpan = document.createElement('span');
+        cidSpan.className = 'inline-image-cid';
+        cidSpan.textContent = `cid:${cid}`;
+        
+        info.appendChild(nameSpan);
+        info.appendChild(cidSpan);
+        
+        const actions = document.createElement('div');
+        actions.className = 'inline-image-actions';
+        
+        const btnInsert = document.createElement('button');
+        btnInsert.type = 'button';
+        btnInsert.className = 'inline-image-btn';
+        btnInsert.title = 'Insert into template';
+        btnInsert.innerHTML = '<i class="fa-solid fa-square-plus"></i>';
+        btnInsert.addEventListener('click', () => {
+          insertHtmlAtCursor(emailBody, `<img src="cid:${cid}" style="max-width: 100%; height: auto;" />`);
+        });
+        
+        const btnDelete = document.createElement('button');
+        btnDelete.type = 'button';
+        btnDelete.className = 'inline-image-btn delete';
+        btnDelete.title = 'Delete image';
+        btnDelete.innerHTML = '<i class="fa-solid fa-trash"></i>';
+        btnDelete.addEventListener('click', () => {
+          delete inlineImages[cid];
+          renderInlineImagesList();
+          updateLivePreview();
+        });
+        
+        actions.appendChild(btnInsert);
+        actions.appendChild(btnDelete);
+        
+        li.appendChild(thumb);
+        li.appendChild(info);
+        li.appendChild(actions);
+        
+        inlineImagesList.appendChild(li);
+      });
+    } else {
+      inlineImagesListContainer.classList.add('hidden');
+    }
+  }
+
   function handleFileUpload(file) {
     const fileExtension = file.name.split('.').pop().toLowerCase();
     
@@ -804,9 +1050,44 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if body contains HTML tags to render dynamically
     const hasHtml = /<[a-z][\s\S]*>/i.test(bodyRendered);
     if (hasHtml) {
-      previewRenderedBody.innerHTML = bodyRendered;
+      let previewHtml = bodyRendered;
+      for (const cid in inlineImages) {
+        const img = inlineImages[cid];
+        const dataUri = `data:${img.contentType};base64,${img.content}`;
+        previewHtml = previewHtml.replace(new RegExp(`cid:${cid}`, 'g'), dataUri);
+      }
+      previewRenderedBody.innerHTML = previewHtml;
     } else {
       previewRenderedBody.textContent = bodyRendered;
+    }
+
+    // Warn user about relative image paths (e.g. src="4.png") which break in email clients
+    const relativeImgRegex = /<img[^>]+src=["'](?!https?:\/\/|cid:)([^"']+)["']/i;
+    const hasRelativeImages = hasHtml && relativeImgRegex.test(bodyRendered);
+    const warningBannerId = 'preview-relative-image-warning';
+    let warningBanner = document.getElementById(warningBannerId);
+    
+    if (hasRelativeImages) {
+      if (!warningBanner) {
+        warningBanner = document.createElement('div');
+        warningBanner.id = warningBannerId;
+        warningBanner.style.background = 'rgba(245, 158, 11, 0.1)';
+        warningBanner.style.border = '1px solid var(--color-warning)';
+        warningBanner.style.color = 'var(--color-warning)';
+        warningBanner.style.borderRadius = 'var(--radius-sm)';
+        warningBanner.style.padding = '10px 14px';
+        warningBanner.style.marginBottom = '15px';
+        warningBanner.style.fontSize = '0.8rem';
+        warningBanner.style.display = 'flex';
+        warningBanner.style.alignItems = 'center';
+        warningBanner.style.gap = '10px';
+        warningBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <span><strong>Relative Image Path Detected:</strong> Images like "4.png" work in local preview but will appear broken in recipients' emails. Please upload them using <strong>3. Inline Images</strong> or use public HTTPS URLs.</span>`;
+        previewRenderedBody.parentNode.insertBefore(warningBanner, previewRenderedBody);
+      }
+    } else {
+      if (warningBanner) {
+        warningBanner.remove();
+      }
     }
 
     // Attachment Row Rendering in Preview
@@ -819,30 +1100,63 @@ document.addEventListener('DOMContentLoaded', () => {
         ['attachment', 'attachmentname', 'file', 'filename', 'document'].includes(h.toLowerCase())
       );
 
-      if (attachmentCol && row[attachmentCol]) {
-        const filename = String(row[attachmentCol]).trim();
+      // Determine personalized attachments
+      const personalizedFilenames = new Set();
+      if (attachmentCol) {
+        recipientsData.forEach(r => {
+          if (r[attachmentCol]) {
+            const val = String(r[attachmentCol]).trim();
+            if (!val.startsWith('http://') && !val.startsWith('https://')) {
+              personalizedFilenames.add(val);
+            }
+          }
+        });
+      }
+
+      // Collect global files (uploaded files that are not referenced in the CSV column)
+      const globalFiles = [];
+      for (const name in uploadedAttachments) {
+        if (!personalizedFilenames.has(name)) {
+          globalFiles.push(name);
+        }
+      }
+
+      const hasPersonalized = !!(attachmentCol && row[attachmentCol]);
+      const hasGlobal = globalFiles.length > 0;
+
+      if (hasPersonalized || hasGlobal) {
         previewAttachmentRow.classList.remove('hidden');
         
-        const isUrl = filename.startsWith('http://') || filename.startsWith('https://');
-        if (isUrl) {
-          const isMega = filename.toLowerCase().includes('mega.nz');
-          if (isMega) {
-            previewAttachmentHeader.style.color = 'var(--accent-cyan)';
-            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> MEGA Attachment <span style="font-size: 0.7rem; opacity: 0.8;">(Will download and attach)</span>`;
+        let previewHtmlParts = [];
+        
+        // Render global attachments
+        if (hasGlobal) {
+          const globalText = globalFiles.map(name => 
+            `<span style="color: var(--color-success); font-weight: 500;"><i class="fa-solid fa-paperclip"></i> ${name} <small style="opacity:0.7">(Global)</small></span>`
+          ).join(', ');
+          previewHtmlParts.push(globalText);
+        }
+
+        // Render personalized attachment
+        if (hasPersonalized) {
+          const filename = String(row[attachmentCol]).trim();
+          const isUrl = filename.startsWith('http://') || filename.startsWith('https://');
+          
+          if (isUrl) {
+            const isMega = filename.toLowerCase().includes('mega.nz');
+            const label = isMega ? 'MEGA Attachment' : 'URL Attachment';
+            previewHtmlParts.push(`<span style="color: var(--accent-cyan); font-weight: 500;"><i class="fa-solid fa-cloud-arrow-down"></i> ${label} <small style="opacity:0.8">(Personalized)</small></span>`);
           } else {
-            previewAttachmentHeader.style.color = 'var(--accent-cyan)';
-            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> URL Attachment <span style="font-size: 0.7rem; opacity: 0.8;">(Will download and attach)</span>`;
-          }
-        } else {
-          const fileExists = !!uploadedAttachments[filename];
-          if (fileExists) {
-            previewAttachmentHeader.style.color = 'var(--color-success)';
-            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-paperclip"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Ready to send)</span>`;
-          } else {
-            previewAttachmentHeader.style.color = 'var(--color-danger)';
-            previewAttachmentHeader.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${filename} <span style="font-size: 0.7rem; opacity: 0.8;">(Missing in Browser Uploads!)</span>`;
+            const fileExists = !!uploadedAttachments[filename];
+            if (fileExists) {
+              previewHtmlParts.push(`<span style="color: var(--color-success); font-weight: 500;"><i class="fa-solid fa-paperclip"></i> ${filename} <small style="opacity:0.8">(Personalized)</small></span>`);
+            } else {
+              previewHtmlParts.push(`<span style="color: var(--color-danger); font-weight: 500;"><i class="fa-solid fa-triangle-exclamation"></i> ${filename} <small style="opacity:0.8; color: var(--color-danger);">(Missing!)</small></span>`);
+            }
           }
         }
+
+        previewAttachmentHeader.innerHTML = previewHtmlParts.join(' | ');
       } else {
         previewAttachmentRow.classList.add('hidden');
       }
@@ -1103,26 +1417,66 @@ document.addEventListener('DOMContentLoaded', () => {
       ['attachment', 'attachmentname', 'file', 'filename', 'document'].includes(h.toLowerCase())
     );
 
-    let attachmentsPayload = null;
+    // Determine personalized attachments
+    const personalizedFilenames = new Set();
+    if (attachmentCol) {
+      recipientsData.forEach(r => {
+        if (r[attachmentCol]) {
+          const val = String(r[attachmentCol]).trim();
+          if (!val.startsWith('http://') && !val.startsWith('https://')) {
+            personalizedFilenames.add(val);
+          }
+        }
+      });
+    }
+
+    let attachmentsPayload = [];
+
+    // 1. Add global attachments (uploaded files that are not personalized)
+    for (const filename in uploadedAttachments) {
+      if (!personalizedFilenames.has(filename)) {
+        const file = uploadedAttachments[filename];
+        try {
+          const base64Content = await getFileBase64(file);
+          attachmentsPayload.push({
+            filename: file.name,
+            content: base64Content,
+            contentType: file.type
+          });
+        } catch (err) {
+          failedCount++;
+          if (logRow) logRow.remove();
+          logSendStatus(currentQueueIndex, row.Email, subjectRendered, 'failed', `Global attachment '${filename}' read error: ${err.message}`);
+          currentQueueIndex++;
+          updateSendingStats();
+          if (isSending && !isPaused) {
+            sendingTimer = setTimeout(processNextQueueItem, currentDelay * 1000);
+          }
+          return;
+        }
+      }
+    }
+
+    // 2. Add personalized attachment (if present)
     if (attachmentCol && row[attachmentCol]) {
       const filename = String(row[attachmentCol]).trim();
       const isUrl = filename.startsWith('http://') || filename.startsWith('https://');
 
       if (isUrl) {
-        attachmentsPayload = [{
+        attachmentsPayload.push({
           filename: 'URL_Attachment',
           url: filename
-        }];
+        });
       } else {
         const file = uploadedAttachments[filename];
         if (file) {
           try {
             const base64Content = await getFileBase64(file);
-            attachmentsPayload = [{
+            attachmentsPayload.push({
               filename: file.name,
               content: base64Content,
               contentType: file.type
-            }];
+            });
           } catch (err) {
             failedCount++;
             if (logRow) logRow.remove(); // Remove the "sending" status log
@@ -1149,6 +1503,22 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // Append inline images if referenced in the email template body
+    const cidRegex = /cid:([a-zA-Z0-9_-]+)/g;
+    const matches = [...bodyRendered.matchAll(cidRegex)];
+    const usedCids = new Set(matches.map(m => m[1]));
+
+    usedCids.forEach(cid => {
+      if (inlineImages[cid]) {
+        attachmentsPayload.push({
+          filename: inlineImages[cid].filename,
+          content: inlineImages[cid].content,
+          contentType: inlineImages[cid].contentType,
+          cid: cid
+        });
+      }
+    });
+
     // Prepare payload
     const emailPayload = {
       email: {
@@ -1157,7 +1527,7 @@ document.addEventListener('DOMContentLoaded', () => {
         subject: subjectRendered,
         html: /<[a-z][\s\S]*>/i.test(bodyRendered) ? bodyRendered : undefined,
         text: /<[a-z][\s\S]*>/i.test(bodyRendered) ? undefined : bodyRendered,
-        attachments: attachmentsPayload || undefined
+        attachments: attachmentsPayload.length > 0 ? attachmentsPayload : undefined
       }
     };
 
