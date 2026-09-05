@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MergeMail - Premium Mail Merge Tool</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- PapaParse for CSV Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- SheetJS for Excel Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Canvas Confetti for Celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Custom Styling -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-icon">
+          <img src="4.png" alt="IEEE Logo">
+        </div>
+        <div class="logo-text">
+          <h1>IEEE Merge<span>Mail</span></h1>
+          <p>Personalized Bulk Emails Instantly</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div id="smtp-status" class="smtp-status-indicator unconfigured">
+          <span class="status-dot"></span>
+          <span id="smtp-status-text">SMTP Offline</span>
+        </div>
+        <span id="user-display" class="user-display-text"></span>
+        <button id="btn-logout" class="btn btn-secondary">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="app-workspace">
+
+      <!-- Left Panel: Recipient Upload & Tags -->
+      <aside class="sidebar-panel">
+
+        <!-- Recipient Card -->
+        <div class="card panel-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-users"></i> 1. Recipient List</h3>
+          </div>
+          <div class="card-body">
+            <!-- CSV/Excel Dropzone -->
+            <div id="csv-dropzone" class="dropzone">
+              <input type="file" id="csv-file-input" accept=".csv, .xlsx, .xls" class="hidden-input">
+              <div class="dropzone-content">
+                <i class="fa-solid fa-file-import upload-icon"></i>
+                <p class="dropzone-text">Drag & drop CSV or Excel here or <span class="browse-link">Browse</span></p>
+                <span class="file-hint">Must include an "Email" column</span>
+              </div>
+            </div>
+
+            <!-- Recipient Summary -->
+            <div id="csv-summary" class="csv-summary hidden">
+              <div class="summary-stat">
+                <span class="summary-label">Recipients Loaded:</span>
+                <span id="recipient-count" class="summary-value">0</span>
+              </div>
+              <div class="summary-stat">
+                <span class="summary-label">Columns Detected:</span>
+                <span id="columns-count" class="summary-value">0</span>
+              </div>
+              <button id="btn-view-recipients" class="btn btn-sm btn-outline btn-full-width">
+                <i class="fa-solid fa-table"></i> View Recipient Data
+              </button>
+            </div>
+
+            <div class="sample-links-container">
+              <span class="sample-label">Download Sample:</span>
+              <a href="#" id="download-sample-csv" class="sample-link"><i class="fa-solid fa-file-csv"></i> CSV</a>
+              <span class="sample-separator">|</span>
+              <a href="#" id="download-sample-xlsx" class="sample-link"><i class="fa-solid fa-file-excel"></i> Excel</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attachments Card -->
+        <div class="card panel-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-paperclip"></i> 1b. Attachments</h3>
+          </div>
+          <div class="card-body">
+            <div id="attachments-dropzone" class="dropzone" style="padding: 20px 10px;">
+              <input type="file" id="attachments-file-input" class="hidden-input" multiple>
+              <div class="dropzone-content">
+                <i class="fa-solid fa-cloud-arrow-up upload-icon" style="font-size: 1.8rem; margin-bottom: 6px;"></i>
+                <p class="dropzone-text" style="font-size: 0.8rem;">Upload custom files here</p>
+                <span class="file-hint" style="font-size: 0.7rem;">Match filenames to columns</span>
+              </div>
+            </div>
+
+            <!-- Uploaded Files List -->
+            <div id="attachments-list-container" class="attachments-list-container hidden" style="margin-top: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Files (<span
+                    id="attachments-count">0</span>):</span>
+                <a href="#" id="btn-clear-attachments"
+                  style="font-size: 0.75rem; color: var(--color-danger); text-decoration: none;">Clear All</a>
+              </div>
+              <ul id="attachments-list"
+                style="list-style: none; display: flex; flex-direction: column; gap: 6px; padding: 0; max-height: 180px; overflow-y: auto;">
+                <!-- Populated dynamically -->
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dynamic Placeholders Card -->
+        <div class="card panel-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-tags"></i> 2. Placeholders</h3>
+          </div>
+          <div class="card-body">
+            <p class="help-text">Click a tag below to insert it at your cursor in the editor:</p>
+            <div id="placeholders-list" class="placeholders-container">
+              <span class="placeholder-tag static-tag" data-tag="Email">{{Email}}</span>
+              <span class="placeholder-tag static-tag" data-tag="Name">{{Name}}</span>
+              <!-- Dynamic tags from CSV header will be appended here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Inline Images Card -->
+        <div class="card panel-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-image"></i> 3. Inline Images</h3>
+          </div>
+          <div class="card-body">
+            <p class="help-text" style="margin-bottom: 12px;">Add images to insert them into your HTML template body as self-contained inline attachments:</p>
+            <button type="button" id="btn-sidebar-add-image" class="btn btn-sm btn-outline btn-full-width" style="margin-bottom: 12px; width: 100%;">
+              <i class="fa-solid fa-plus"></i> Add Inline Image
+            </button>
+            
+            <div id="inline-images-list-container" class="attachments-list-container hidden" style="margin-top: 12px;">
+              <ul id="inline-images-list" style="list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 0; max-height: 180px; overflow-y: auto;">
+                <!-- Populated dynamically -->
+              </ul>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Central Editing and Sending Area -->
+      <section class="main-panel">
+        <!-- Tabs Header -->
+        <div class="tabs-nav">
+          <button class="tab-link active" data-tab="tab-compose">
+            <i class="fa-solid fa-pen-nib"></i> Compose Template
+          </button>
+          <button class="tab-link" data-tab="tab-preview" id="tab-btn-preview">
+            <i class="fa-solid fa-eye"></i> Live Preview
+          </button>
+          <button class="tab-link" data-tab="tab-send" id="tab-btn-send">
+            <i class="fa-solid fa-share-from-square"></i> Sending Queue
+          </button>
+        </div>
+
+        <!-- Tab Content Areas -->
+        <div class="tab-content-container">
+
+          <!-- TAB 1: COMPOSE -->
+          <div id="tab-compose" class="tab-content active">
+            <div class="card workspace-card">
+              <div class="compose-fields">
+                <div class="form-group">
+                  <label for="email-from-name">Sender Name (Optional)</label>
+                  <input type="text" id="email-from-name" placeholder="e.g. John Doe" class="form-control">
+                </div>
+
+                <div class="form-group">
+                  <label for="email-subject">Email Subject</label>
+                  <input type="text" id="email-subject" placeholder="Enter subject line (e.g. Hello {{Name}}!)"
+                    class="form-control font-medium">
+                </div>
+
+                <div class="form-group flex-grow-1">
+                  <div class="body-header">
+                    <label for="email-body">Email Body (Plain Text or HTML)</label>
+                    <div class="editor-tips" style="display: flex; align-items: center; gap: 12px;">
+                      <button type="button" id="btn-insert-image" class="btn btn-sm btn-outline" style="padding: 4px 10px; font-size: 0.75rem; border-radius: 6px;">
+                        <i class="fa-solid fa-image"></i> Insert Image
+                      </button>
+                      <span><i class="fa-solid fa-code"></i> HTML formatting supported</span>
+                    </div>
+                  </div>
+                  <textarea id="email-body" class="form-control body-textarea"
+                    placeholder="Write your email template here...&#10;&#10;Hi {{Name}},&#10;&#10;Welcome to our launch! Your registered email is {{Email}}.&#10;&#10;Best regards,&#10;The Team"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: LIVE PREVIEW -->
+          <div id="tab-preview" class="tab-content">
+            <div class="card workspace-card">
+              <!-- Navigation header for Previewing -->
+              <div class="preview-toolbar">
+                <div class="preview-selector">
+                  <button id="btn-prev-recipient" class="btn btn-circle btn-secondary" title="Previous Recipient">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <div class="preview-index-container">
+                    <span class="preview-index-label">Previewing Recipient:</span>
+                    <span id="preview-current-index" class="preview-current">0</span>
+                    <span class="preview-separator">of</span>
+                    <span id="preview-total-count" class="preview-total">0</span>
+                  </div>
+                  <button id="btn-next-recipient" class="btn btn-circle btn-secondary" title="Next Recipient">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+
+                <div class="preview-search-container">
+                  <select id="preview-recipient-dropdown" class="form-control form-control-sm">
+                    <option value="">-- Select Recipient --</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Mock Email Window Client -->
+              <div class="mock-mail-client">
+                <div class="mail-client-header">
+                  <div class="window-dot red"></div>
+                  <div class="window-dot yellow"></div>
+                  <div class="window-dot green"></div>
+                  <div class="window-title">Preview Mail Output</div>
+                </div>
+                <div class="mail-client-metadata">
+                  <div class="meta-row">
+                    <span class="meta-label">From:</span>
+                    <span id="preview-from-header" class="meta-val">Sender Name &lt;smtp-user&gt;</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">To:</span>
+                    <span id="preview-to-header" class="meta-val highlight-email">recipient@domain.com</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">Subject:</span>
+                    <span id="preview-subject-header" class="meta-val font-semibold">Subject text here</span>
+                  </div>
+                  <div class="meta-row hidden" id="preview-attachment-row">
+                    <span class="meta-label">Attach:</span>
+                    <span id="preview-attachment-header" class="meta-val"
+                      style="color: var(--accent-purple); font-weight: 500; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;"></span>
+                  </div>
+                </div>
+                <div class="mail-client-body">
+                  <div id="preview-rendered-body" class="rendered-body-content">
+                    <!-- Parsed and rendered HTML/text content goes here -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: SENDING QUEUE -->
+          <div id="tab-send" class="tab-content">
+            <div class="card workspace-card">
+              <!-- Grid Stats Panel -->
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-icon bg-indigo"><i class="fa-solid fa-paper-plane"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Total Emails</span>
+                    <span id="stat-total" class="stat-number">0</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon bg-yellow"><i class="fa-solid fa-clock"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Pending</span>
+                    <span id="stat-pending" class="stat-number">0</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon bg-green"><i class="fa-solid fa-circle-check"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Successful</span>
+                    <span id="stat-success" class="stat-number">0</span>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon bg-red"><i class="fa-solid fa-circle-exclamation"></i></div>
+                  <div class="stat-details">
+                    <span class="stat-title">Failed</span>
+                    <span id="stat-failed" class="stat-number">0</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Controls and Progress -->
+              <div class="queue-controls-section">
+                <div class="progress-container">
+                  <div class="progress-bar-header">
+                    <span class="progress-status-text" id="sending-status-label">Ready to send</span>
+                    <span class="progress-percentage-text" id="sending-percentage-label">0%</span>
+                  </div>
+                  <div class="progress-bar-track">
+                    <div id="sending-progress-bar" class="progress-bar-fill" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <div class="sending-settings-row">
+                  <div class="form-group flex-row-item">
+                    <label for="sending-delay" class="horizontal-label">
+                      Delay between emails: <span id="delay-val">1.5s</span>
+                    </label>
+                    <input type="range" id="sending-delay" min="0.1" max="10.0" step="0.1" value="1.5"
+                      class="range-slider">
+                  </div>
+
+                  <div class="action-buttons">
+                    <button id="btn-start-sending" class="btn btn-primary btn-lg">
+                      <i class="fa-solid fa-play"></i> Start Bulk Send
+                    </button>
+                    <button id="btn-pause-sending" class="btn btn-secondary btn-lg" disabled>
+                      <i class="fa-solid fa-pause"></i> Pause
+                    </button>
+                    <button id="btn-stop-sending" class="btn btn-danger btn-lg" disabled>
+                      <i class="fa-solid fa-stop"></i> Stop
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Queue Logs Section -->
+              <div class="queue-logs-wrapper">
+                <div class="logs-header">
+                  <h4><i class="fa-solid fa-list-check"></i> Process Logs</h4>
+                  <button id="btn-clear-logs" class="btn btn-sm btn-outline">Clear Logs</button>
+                </div>
+                <div class="logs-table-container">
+                  <table class="logs-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 80px;">Index</th>
+                        <th>Recipient Email</th>
+                        <th>Subject</th>
+                        <th style="width: 150px;">Status</th>
+                        <th style="width: 250px;">Message / Error</th>
+                      </tr>
+                    </thead>
+                    <tbody id="queue-logs-tbody">
+                      <tr class="empty-log-row">
+                        <td colspan="5" class="text-center">No send jobs run yet. Start the bulk send to generate logs.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modern Dual-Pane Authentication Modal with Interactive Motion Character -->
+  <div id="login-screen" class="login-overlay">
+    <!-- Ambient Floating Orbs -->
+    <div class="auth-ambient-orbs">
+      <div class="ambient-orb orb-1"></div>
+      <div class="ambient-orb orb-2"></div>
+      <div class="ambient-orb orb-3"></div>
+      <div class="ambient-grid-pattern"></div>
+    </div>
+
+    <div class="auth-split-modal">
+      
+      <!-- 1. LEFT FORM SECTION -->
+      <div class="auth-form-column">
+        <!-- Brand Header -->
+        <div class="auth-card-header">
+          <div class="auth-brand-row">
+            <div class="auth-logo-badge">
+              <img src="4.png" alt="IEEE Logo">
+            </div>
+            <div class="auth-brand-tag">
+              <span class="pulse-status-dot"></span>
+              <span>Cloud Merge v2.4</span>
+            </div>
+          </div>
+          <h2 class="auth-title">IEEE Merge<span>Mail</span></h2>
+          <p class="auth-subtitle">Welcome back! Sign in to access your email studio</p>
+        </div>
+
+        <!-- Segmented Navigation Tabs with Gliding Pill -->
+        <div class="auth-segmented-nav">
+          <div class="auth-nav-slider"></div>
+          <button type="button" id="tab-auth-login" class="auth-tab-btn active">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
+          </button>
+          <button type="button" id="tab-auth-signup" class="auth-tab-btn">
+            <i class="fa-solid fa-user-plus"></i> Sign Up
+          </button>
+        </div>
+
+        <!-- 1A. LOGIN VIEW -->
+        <div id="login-view" class="auth-view-content">
+          <form id="login-form" class="auth-form" novalidate>
+            <div class="auth-field-group">
+              <label for="login-username" class="auth-label">
+                <span>Username or Email</span>
+              </label>
+              <div class="auth-input-wrapper">
+                <i class="fa-solid fa-user input-lead-icon"></i>
+                <input type="text" id="login-username" placeholder="Enter your username/email" class="auth-input" required autocomplete="username" spellcheck="false">
+                <span class="input-focus-border"></span>
+              </div>
+            </div>
+
+            <div class="auth-field-group">
+              <div class="auth-label-row">
+                <label for="login-password" class="auth-label">Password</label>
+              </div>
+              <div class="auth-input-wrapper">
+                <i class="fa-solid fa-lock input-lead-icon"></i>
+                <input type="password" id="login-password" placeholder="Enter your password" class="auth-input" required autocomplete="current-password">
+                <button type="button" class="btn-toggle-password" data-target="login-password" title="Toggle password visibility" tabindex="-1">
+                  <i class="fa-regular fa-eye"></i>
+                </button>
+                <span class="input-focus-border"></span>
+              </div>
+              <!-- Caps Lock Alert -->
+              <div id="login-caps-warning" class="caps-warning-pill hidden">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Caps Lock is ON</span>
+              </div>
+            </div>
+
+            <div class="auth-extras-row">
+              <label class="auth-checkbox-label">
+                <input type="checkbox" id="login-remember" class="auth-checkbox">
+                <span class="custom-check-indicator"></span>
+                <span class="checkbox-text">Remember this device</span>
+              </label>
+            </div>
+
+            <div id="login-error" class="auth-error-banner hidden">
+              <i class="fa-solid fa-circle-exclamation error-icon"></i>
+              <span id="login-error-text">Invalid username or password.</span>
+            </div>
+
+            <button type="submit" id="btn-login-submit" class="btn btn-primary btn-auth-action">
+              <span class="btn-action-text"><i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In to Workspace</span>
+            </button>
+          </form>
+
+          <div class="auth-footer-prompt">
+            <span>Don't have an account yet?</span>
+            <a href="#" id="link-goto-signup" class="auth-switch-link">Create Account</a>
+          </div>
+        </div>
+
+        <!-- 1B. SIGNUP VIEW -->
+        <div id="signup-view" class="auth-view-content hidden">
+          <form id="signup-form" class="auth-form" novalidate>
+            <div class="auth-field-group">
+              <label for="signup-username" class="auth-label">Username</label>
+              <div class="auth-input-wrapper">
+                <i class="fa-solid fa-user-tag input-lead-icon"></i>
+                <input type="text" id="signup-username" placeholder="Choose a unique username" class="auth-input" required autocomplete="username" spellcheck="false">
+                <span class="input-focus-border"></span>
+              </div>
+            </div>
+
+            <div class="auth-field-group">
+              <label for="signup-email" class="auth-label">Gmail Address</label>
+              <div class="auth-input-wrapper">
+                <i class="fa-solid fa-envelope input-lead-icon"></i>
+                <input type="email" id="signup-email" placeholder="your-email@gmail.com" class="auth-input" required autocomplete="email">
+                <span class="input-focus-border"></span>
+              </div>
+              <span class="auth-field-hint"><i class="fa-solid fa-shield-halved"></i> Verification request sent to host administrator</span>
+            </div>
+
+            <div class="auth-field-group">
+              <label for="signup-password" class="auth-label">Password</label>
+              <div class="auth-input-wrapper">
+                <i class="fa-solid fa-key input-lead-icon"></i>
+                <input type="password" id="signup-password" placeholder="Create a strong password" class="auth-input" required autocomplete="new-password">
+                <button type="button" class="btn-toggle-password" data-target="signup-password" title="Toggle password visibility" tabindex="-1">
+                  <i class="fa-regular fa-eye"></i>
+                </button>
+                <span class="input-focus-border"></span>
+              </div>
+
+              <!-- Caps Lock Alert for Signup -->
+              <div id="signup-caps-warning" class="caps-warning-pill hidden">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Caps Lock is ON</span>
+              </div>
+              
+              <!-- Dynamic Password Strength Bar & Matrix -->
+              <div class="password-strength-container">
+                <div class="strength-track">
+                  <div id="signup-strength-bar" class="strength-fill strength-empty"></div>
+                </div>
+                <div class="strength-meta">
+                  <span class="strength-title">Security: <strong id="signup-strength-label">Enter password</strong></span>
+                  <span id="signup-strength-req" class="strength-req">6+ characters</span>
+                </div>
+                <!-- Interactive Checklist Badges -->
+                <div class="strength-requirements-matrix">
+                  <span id="req-length" class="req-chip"><i class="fa-solid fa-circle-notch"></i> 6+ chars</span>
+                  <span id="req-letter" class="req-chip"><i class="fa-solid fa-circle-notch"></i> A-z mixed</span>
+                  <span id="req-number" class="req-chip"><i class="fa-solid fa-circle-notch"></i> Number</span>
+                  <span id="req-special" class="req-chip"><i class="fa-solid fa-circle-notch"></i> Symbol</span>
+                </div>
+              </div>
+            </div>
+
+            <div id="signup-error" class="auth-error-banner hidden">
+              <i class="fa-solid fa-circle-exclamation error-icon"></i>
+              <span id="signup-error-text">Failed to register.</span>
+            </div>
+
+            <button type="submit" id="btn-signup-submit" class="btn btn-primary btn-auth-action">
+              <span class="btn-action-text"><i class="fa-solid fa-paper-plane"></i> Request Approval Code</span>
+            </button>
+          </form>
+
+          <div class="auth-footer-prompt">
+            <span>Already registered?</span>
+            <a href="#" id="link-goto-login" class="auth-switch-link">Sign In Instead</a>
+          </div>
+        </div>
+
+        <!-- 1C. VERIFY VIEW -->
+        <div id="verify-view" class="auth-view-content hidden">
+          <div class="auth-verify-header">
+            <div class="verify-icon-badge">
+              <i class="fa-solid fa-envelope-circle-check"></i>
+            </div>
+            <h3 class="verify-title">Enter Verification Code</h3>
+            <p class="verify-desc">A 6-digit approval code was requested for <strong id="verify-email-display" class="verify-email-highlight"></strong>.</p>
+          </div>
+
+          <form id="verify-form" class="auth-form">
+            <div class="auth-field-group text-center">
+              <label class="auth-label">6-Digit Code</label>
+              <!-- Segmented 6-Digit OTP Input Boxes -->
+              <div class="otp-segmented-container">
+                <input type="text" class="otp-digit-box" maxlength="1" data-index="0" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autofocus>
+                <input type="text" class="otp-digit-box" maxlength="1" data-index="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+                <input type="text" class="otp-digit-box" maxlength="1" data-index="2" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+                <span class="otp-separator">-</span>
+                <input type="text" class="otp-digit-box" maxlength="1" data-index="3" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+                <input type="text" class="otp-digit-box" maxlength="1" data-index="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+                <input type="text" class="otp-digit-box" maxlength="1" data-index="5" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+              </div>
+              <!-- Hidden combined input for form binding -->
+              <input type="hidden" id="verify-code" name="verify-code">
+            </div>
+
+            <div id="verify-error" class="auth-error-banner hidden">
+              <i class="fa-solid fa-circle-exclamation error-icon"></i>
+              <span id="verify-error-text">Invalid or expired code.</span>
+            </div>
+
+            <button type="submit" id="btn-verify-submit" class="btn btn-primary btn-auth-action">
+              <span class="btn-action-text"><i class="fa-solid fa-circle-check"></i> Verify & Unlock Studio</span>
+            </button>
+          </form>
+
+          <div class="auth-footer-prompt text-center">
+            <a href="#" id="link-back-to-signup" class="auth-back-link">
+              <i class="fa-solid fa-arrow-left"></i> Back to Registration
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. RIGHT INTERACTIVE MOTION MASCOT & FEATURE SHOWCASE SECTION -->
+      <div class="auth-motion-column">
+        <!-- Floating Ambient Aura Particles -->
+        <div class="motion-bg-pattern">
+          <div class="bg-circle c1"></div>
+          <div class="bg-circle c2"></div>
+          <div class="bg-circle c3"></div>
+          <div class="floating-tech-grid"></div>
+        </div>
+
+        <!-- Top Feature Showcase Pill Carousel -->
+        <div class="auth-feature-pill-strip">
+          <div class="feature-chip active">
+            <i class="fa-solid fa-bolt"></i> Fast SMTP Relay
+          </div>
+          <div class="feature-chip">
+            <i class="fa-solid fa-shield-halved"></i> TLS 1.3 Secure
+          </div>
+          <div class="feature-chip">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Dynamic Tags
+          </div>
+        </div>
+
+        <!-- Interactive Reactive Speech Bubble -->
+        <div id="avatar-speech-bubble" class="avatar-speech-bubble">
+          <span class="speech-dot"></span>
+          <span id="avatar-speech-text">Welcome! Let's get you signed in.</span>
+        </div>
+
+        <!-- Modern High-Precision Vector Interactive Avatar Stage -->
+        <div class="avatar-stage">
+          <svg id="interactive-avatar" class="interactive-avatar-svg" viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#312e81" />
+                <stop offset="50%" stop-color="#1e1b4b" />
+                <stop offset="100%" stop-color="#0f172a" />
+              </linearGradient>
+              <linearGradient id="hairHighlight" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#818cf8" stop-opacity="0.6" />
+                <stop offset="100%" stop-color="#c084fc" stop-opacity="0.1" />
+              </linearGradient>
+              <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#ffedd5" />
+                <stop offset="100%" stop-color="#fed7aa" />
+              </linearGradient>
+              <linearGradient id="skinShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#fdba74" />
+                <stop offset="100%" stop-color="#fb923c" />
+              </linearGradient>
+              <linearGradient id="hoodieGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="50%" stop-color="#4f46e5" />
+                <stop offset="100%" stop-color="#3730a3" />
+              </linearGradient>
+              <linearGradient id="visorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#6366f1" />
+              </linearGradient>
+              <linearGradient id="tabletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1e293b" />
+                <stop offset="100%" stop-color="#0f172a" />
+              </linearGradient>
+              <linearGradient id="screenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#06b6d4" />
+                <stop offset="50%" stop-color="#3b82f6" />
+                <stop offset="100%" stop-color="#8b5cf6" />
+              </linearGradient>
+              <filter id="glowEffect" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Mascot Back Silhouette / Glow -->
+            <ellipse cx="150" cy="275" rx="85" ry="30" fill="rgba(0,0,0,0.25)" filter="url(#glowEffect)" />
+
+            <!-- Back Hair / Hood Arc -->
+            <path class="avatar-back-hair" d="M 82 120 C 65 180 75 240 92 255 C 115 245 185 245 208 255 C 225 240 235 180 218 120 Z" fill="url(#hairGrad)" />
+
+            <!-- Torso / Tech Hoodie -->
+            <g id="avatar-body" class="avatar-body-group">
+              <path d="M 85 235 C 75 270 58 320 52 320 L 248 320 C 242 320 225 270 215 235 Z" fill="url(#hoodieGrad)" />
+              <!-- Tech Accent Seams -->
+              <path d="M 125 220 L 150 250 L 175 220 Z" fill="#312e81" opacity="0.4" />
+              <line x1="150" y1="250" x2="150" y2="320" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="4 4" opacity="0.7" />
+              <!-- Hoodie strings / collar badge -->
+              <circle cx="150" cy="250" r="5" fill="#38bdf8" filter="url(#glowEffect)" />
+            </g>
+
+            <!-- Neck -->
+            <rect x="135" y="195" width="30" height="30" rx="8" fill="url(#skinShadow)" />
+
+            <!-- Head Group (Tilts & Gaze Motion) -->
+            <g id="avatar-head-group" class="avatar-head-group">
+              <!-- Head Silhouette & Face -->
+              <ellipse cx="150" cy="142" rx="52" ry="58" fill="url(#skinGrad)" />
+              
+              <!-- Subtle Cheek Blushes -->
+              <ellipse cx="118" cy="158" rx="11" ry="8" fill="#fb7185" opacity="0.32" />
+              <ellipse cx="182" cy="158" rx="11" ry="8" fill="#fb7185" opacity="0.32" />
+
+              <!-- Left Eye Socket Glass -->
+              <ellipse cx="127" cy="138" rx="12" ry="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+              <!-- Right Eye Socket Glass -->
+              <ellipse cx="173" cy="138" rx="12" ry="14" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+
+              <!-- Movable Pupils (JS Gaze Controller) -->
+              <g id="avatar-pupils" class="avatar-pupils">
+                <!-- Left Pupil -->
+                <circle id="pupil-left" cx="127" cy="138" r="6.5" fill="#1e1b4b" />
+                <circle cx="129" cy="135" r="2.5" fill="#38bdf8" />
+                <circle cx="125" cy="140" r="1.2" fill="#ffffff" />
+                <!-- Right Pupil -->
+                <circle id="pupil-right" cx="173" cy="138" r="6.5" fill="#1e1b4b" />
+                <circle cx="175" cy="135" r="2.5" fill="#38bdf8" />
+                <circle cx="171" cy="140" r="1.2" fill="#ffffff" />
+              </g>
+
+              <!-- Eyelids for Natural Blinking Animation -->
+              <g id="avatar-eyelids" class="avatar-eyelids">
+                <path d="M 113 138 C 113 123 141 123 141 138 Z" fill="url(#skinGrad)" />
+                <path d="M 159 138 C 159 123 187 123 187 138 Z" fill="url(#skinGrad)" />
+              </g>
+
+              <!-- Eyebrows -->
+              <g id="avatar-eyebrows" class="avatar-eyebrows">
+                <path id="eyebrow-left" d="M 115 120 Q 127 114 139 120" stroke="#1e1b4b" stroke-width="3.5" stroke-linecap="round" fill="none" />
+                <path id="eyebrow-right" d="M 161 120 Q 173 114 185 120" stroke="#1e1b4b" stroke-width="3.5" stroke-linecap="round" fill="none" />
+              </g>
+
+              <!-- Cute Minimal Nose -->
+              <path d="M 148 147 Q 150 154 154 151" stroke="#f97316" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.65" />
+
+              <!-- Dynamic Interactive Mouth Curve -->
+              <path id="avatar-mouth" class="avatar-mouth" d="M 137 168 Q 150 179 163 168" stroke="#be123c" stroke-width="3.5" stroke-linecap="round" fill="none" />
+
+              <!-- Styled Front Hair with Highlights -->
+              <path class="avatar-front-hair" d="M 98 135 C 93 84 126 68 150 68 C 178 68 207 84 202 135 C 190 102 172 94 150 94 C 128 94 110 102 98 135 Z" fill="url(#hairGrad)" />
+              <!-- Hair Sheen Strand -->
+              <path d="M 110 115 C 130 85 170 85 188 112 C 168 96 130 96 110 115 Z" fill="url(#hairHighlight)" />
+              <path d="M 98 128 C 114 98 142 102 154 112 C 136 116 120 132 112 152 Z" fill="url(#hairGrad)" />
+            </g>
+
+            <!-- Default Pose: Tech Device / Holo Tablet -->
+            <g id="avatar-holding-tablet" class="avatar-holding-tablet">
+              <!-- Tablet Frame -->
+              <g id="avatar-tablet" class="avatar-tablet">
+                <rect x="105" y="232" width="90" height="60" rx="10" fill="url(#tabletGrad)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" transform="rotate(-3 150 262)" filter="url(#glowEffect)" />
+                <rect x="111" y="238" width="78" height="48" rx="6" fill="url(#screenGrad)" transform="rotate(-3 150 262)" />
+                <!-- Screen UI Lines -->
+                <line x1="120" y1="250" x2="160" y2="250" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.9" transform="rotate(-3 150 262)" />
+                <line x1="120" y1="262" x2="178" y2="262" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity="0.7" transform="rotate(-3 150 262)" />
+                <circle cx="178" cy="250" r="4.5" fill="#38bdf8" filter="url(#glowEffect)" transform="rotate(-3 150 262)" />
+              </g>
+
+              <!-- Left & Right Hands Gripping Tablet -->
+              <ellipse cx="102" cy="260" rx="11" ry="13" fill="url(#skinGrad)" stroke="#fdba74" stroke-width="1" transform="rotate(22 102 260)" />
+              <ellipse cx="198" cy="256" rx="11" ry="13" fill="url(#skinGrad)" stroke="#fdba74" stroke-width="1" transform="rotate(-22 198 256)" />
+            </g>
+
+            <!-- Animated Hands/Arms for Covering Eyes (Password typing & Peeking) -->
+            <g id="avatar-cover-arms" class="avatar-cover-arms">
+              <!-- Left Arm & Hand covering Left Eye -->
+              <g id="cover-left-arm" class="cover-arm cover-left">
+                <path d="M 68 310 Q 80 215 122 144" stroke="url(#hoodieGrad)" stroke-width="28" stroke-linecap="round" fill="none" />
+                <ellipse cx="125" cy="138" rx="17" ry="16" fill="url(#skinGrad)" stroke="#fdba74" stroke-width="1" />
+                <path d="M 115 130 Q 127 124 137 133" stroke="#ea580c" stroke-width="2.2" fill="none" opacity="0.35" />
+                <path d="M 113 140 Q 125 134 135 143" stroke="#ea580c" stroke-width="2.2" fill="none" opacity="0.35" />
+              </g>
+
+              <!-- Right Arm & Hand covering Right Eye -->
+              <g id="cover-right-arm" class="cover-arm cover-right">
+                <path d="M 232 310 Q 220 215 178 144" stroke="url(#hoodieGrad)" stroke-width="28" stroke-linecap="round" fill="none" />
+                <ellipse cx="175" cy="138" rx="17" ry="16" fill="url(#skinGrad)" stroke="#fdba74" stroke-width="1" />
+                <path d="M 163 130 Q 175 124 185 133" stroke="#ea580c" stroke-width="2.2" fill="none" opacity="0.35" />
+                <path d="M 161 140 Q 173 134 183 143" stroke="#ea580c" stroke-width="2.2" fill="none" opacity="0.35" />
+              </g>
+            </g>
+
+          </svg>
+        </div>
+
+        <!-- Security & Status Footer Pill Group -->
+        <div class="motion-footer-badge-group">
+          <div class="motion-footer-badge">
+            <i class="fa-solid fa-lock"></i>
+            <span>256-bit TLS Encrypted Session</span>
+          </div>
+          <div class="motion-security-status">
+            <span class="live-dot"></span>
+            <span>SMTP Server Ready</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: Recipient Grid Data Viewer -->
+  <div id="recipients-modal" class="modal-overlay">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-table"></i> Loaded Recipient Data</h2>
+        <button id="btn-close-recipients" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body flex-column">
+        <p class="modal-desc">This is the parsed data from your CSV file. Make sure your column headers match your
+          placeholders.</p>
+        <div class="grid-table-container">
+          <table class="grid-data-table">
+            <thead id="recipients-table-thead">
+              <!-- Generated headers -->
+            </thead>
+            <tbody id="recipients-table-tbody">
+              <!-- Generated rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="row-count-label" id="recipients-modal-count">0 rows loaded</span>
+        <button id="btn-close-recipients-footer" class="btn btn-secondary">Close Viewer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Insert Image -->
+  <div id="image-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-image"></i> Insert Image</h2>
+        <button id="btn-close-image-modal" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body flex-column">
+        <!-- Tabs for Modal: Local File vs URL -->
+        <div class="modal-tabs" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+          <button type="button" id="tab-btn-local-image" class="btn btn-sm btn-primary" style="flex: 1; padding: 8px 12px;">Upload Local Image</button>
+          <button type="button" id="tab-btn-url-image" class="btn btn-sm btn-secondary" style="flex: 1; padding: 8px 12px;">Image URL</button>
+        </div>
+
+        <!-- Option 1: Local Image Upload -->
+        <div id="modal-sec-local" class="modal-section">
+          <div id="image-dropzone" class="dropzone" style="padding: 20px 10px; margin-bottom: 15px;">
+            <input type="file" id="image-file-input" accept="image/*" class="hidden-input">
+            <div class="dropzone-content">
+              <i class="fa-solid fa-cloud-arrow-up upload-icon" style="font-size: 1.8rem; margin-bottom: 6px;"></i>
+              <p class="dropzone-text" style="font-size: 0.85rem; color: var(--text-primary);">Drag & drop image here or <span class="browse-link">Browse</span></p>
+              <span class="file-hint" style="font-size: 0.7rem;">PNG, JPG, JPEG, GIF supported</span>
+            </div>
+          </div>
+          
+          <div id="image-upload-preview-container" class="hidden" style="margin-bottom: 15px; text-align: center;">
+            <img id="image-upload-preview" src="" style="max-height: 120px; max-width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border-color);" alt="Preview">
+            <p id="image-upload-filename" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 5px;"></p>
+          </div>
+
+          <div class="form-group">
+            <label for="image-cid-input">Image ID (letters, numbers, underscores only)</label>
+            <input type="text" id="image-cid-input" placeholder="e.g. logo, signature" class="form-control" style="font-size: 0.9rem;">
+            <span class="file-hint" style="font-size: 0.7rem; margin-top: 4px;">Referenced in HTML as cid:imageId (e.g. &lt;img src="cid:logo" /&gt;)</span>
+          </div>
+        </div>
+
+        <!-- Option 2: Image URL -->
+        <div id="modal-sec-url" class="modal-section hidden">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label for="image-url-input">Public Image URL</label>
+            <input type="url" id="image-url-input" placeholder="https://example.com/image.png" class="form-control" style="font-size: 0.9rem;">
+          </div>
+          <div class="form-group">
+            <label for="image-alt-input">Alternative Text (Optional)</label>
+            <input type="text" id="image-alt-input" placeholder="e.g. Company Logo" class="form-control" style="font-size: 0.9rem;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
+        <button type="button" id="btn-cancel-image-modal" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="btn-insert-image-submit" class="btn btn-primary">Insert Image</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Scripts -->
+  <script src="app.js"></script>
+</body>
+
+</html>
