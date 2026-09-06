@@ -50,9 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const signupUsernameInput = document.getElementById('signup-username');
   const signupEmailInput = document.getElementById('signup-email');
   const signupPasswordInput = document.getElementById('signup-password');
-  const signupStrengthBar = document.getElementById('signup-strength-bar');
-  const signupStrengthLabel = document.getElementById('signup-strength-label');
-  const signupStrengthReq = document.getElementById('signup-strength-req');
   const signupError = document.getElementById('signup-error');
   const signupErrorText = document.getElementById('signup-error-text');
 
@@ -213,6 +210,96 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Authentication System, Dual-Pane Modal & Interactive Motion Avatar ---
 
+  // Cursor Spotlight Tracking Controller on Modal Card
+  const authModalCard = document.getElementById('auth-modal-card');
+  if (authModalCard) {
+    authModalCard.addEventListener('mousemove', (e) => {
+      const rect = authModalCard.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      authModalCard.style.setProperty('--mouse-x', `${x}%`);
+      authModalCard.style.setProperty('--mouse-y', `${y}%`);
+    });
+  }
+
+  // Ambient Dynamic Particles Starfield Canvas
+  function initAuthParticles() {
+    const canvas = document.getElementById('auth-particles-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    const particleCount = 42;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    class Particle {
+      constructor() {
+        this.reset();
+      }
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.vx = (Math.random() - 0.5) * 0.45;
+        this.vy = (Math.random() - 0.5) * 0.45;
+        this.radius = Math.random() * 2 + 1;
+        this.color = Math.random() > 0.5 ? '#818cf8' : '#38bdf8';
+        this.alpha = Math.random() * 0.45 + 0.2;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+        if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = this.alpha;
+        ctx.fill();
+      }
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle());
+    }
+
+    function renderParticles() {
+      if (loginScreen && loginScreen.classList.contains('hidden')) {
+        requestAnimationFrame(renderParticles);
+        return;
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+        particles[i].draw();
+
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 115) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = '#6366f1';
+            ctx.globalAlpha = (1 - dist / 115) * 0.2;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(renderParticles);
+    }
+    renderParticles();
+  }
+  initAuthParticles();
+
   // Interactive Avatar Elements & State Controller
   const avatarMotionColumn = document.querySelector('.auth-motion-column');
   const avatarSpeechText = document.getElementById('avatar-speech-text');
@@ -222,12 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const authSegmentedNav = document.querySelector('.auth-segmented-nav');
   const loginCapsWarning = document.getElementById('login-caps-warning');
   const signupCapsWarning = document.getElementById('signup-caps-warning');
-  
-  // Password Requirement Badges
-  const reqLength = document.getElementById('req-length');
-  const reqLetter = document.getElementById('req-letter');
-  const reqNumber = document.getElementById('req-number');
-  const reqSpecial = document.getElementById('req-special');
 
   // Segmented OTP Digit Boxes
   const otpDigitBoxes = document.querySelectorAll('.otp-digit-box');

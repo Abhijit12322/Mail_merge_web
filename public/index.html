@@ -382,15 +382,18 @@
 
   <!-- Modern Dual-Pane Authentication Modal with Interactive Motion Character -->
   <div id="login-screen" class="login-overlay">
-    <!-- Ambient Floating Orbs -->
+    <!-- Ambient Floating Orbs & Interactive Particle Mesh -->
     <div class="auth-ambient-orbs">
+      <canvas id="auth-particles-canvas" class="auth-particles-canvas"></canvas>
       <div class="ambient-orb orb-1"></div>
       <div class="ambient-orb orb-2"></div>
       <div class="ambient-orb orb-3"></div>
       <div class="ambient-grid-pattern"></div>
     </div>
 
-    <div class="auth-split-modal">
+    <div class="auth-split-modal" id="auth-modal-card">
+      <!-- Dynamic Cursor Spotlight Layer -->
+      <div class="modal-spotlight-glow"></div>
       
       <!-- 1. LEFT FORM SECTION -->
       <div class="auth-form-column">
@@ -406,7 +409,7 @@
             </div>
           </div>
           <h2 class="auth-title">IEEE Merge<span>Mail</span></h2>
-          <p class="auth-subtitle">Welcome back! Sign in to access your email studio</p>
+          <p class="auth-subtitle">Enterprise-grade personalized email dispatch studio</p>
         </div>
 
         <!-- Segmented Navigation Tabs with Gliding Pill -->
@@ -515,24 +518,6 @@
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <span>Caps Lock is ON</span>
               </div>
-              
-              <!-- Dynamic Password Strength Bar & Matrix -->
-              <div class="password-strength-container">
-                <div class="strength-track">
-                  <div id="signup-strength-bar" class="strength-fill strength-empty"></div>
-                </div>
-                <div class="strength-meta">
-                  <span class="strength-title">Security: <strong id="signup-strength-label">Enter password</strong></span>
-                  <span id="signup-strength-req" class="strength-req">6+ characters</span>
-                </div>
-                <!-- Interactive Checklist Badges -->
-                <div class="strength-requirements-matrix">
-                  <span id="req-length" class="req-chip"><i class="fa-solid fa-circle-notch"></i> 6+ chars</span>
-                  <span id="req-letter" class="req-chip"><i class="fa-solid fa-circle-notch"></i> A-z mixed</span>
-                  <span id="req-number" class="req-chip"><i class="fa-solid fa-circle-notch"></i> Number</span>
-                  <span id="req-special" class="req-chip"><i class="fa-solid fa-circle-notch"></i> Symbol</span>
-                </div>
-              </div>
             </div>
 
             <div id="signup-error" class="auth-error-banner hidden">
@@ -609,13 +594,31 @@
         <!-- Top Feature Showcase Pill Carousel -->
         <div class="auth-feature-pill-strip">
           <div class="feature-chip active">
-            <i class="fa-solid fa-bolt"></i> Fast SMTP Relay
+            <i class="fa-solid fa-bolt"></i> High-Speed Relay
           </div>
           <div class="feature-chip">
-            <i class="fa-solid fa-shield-halved"></i> TLS 1.3 Secure
+            <i class="fa-solid fa-shield-halved"></i> TLS 1.3
           </div>
           <div class="feature-chip">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Dynamic Tags
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Tags
+          </div>
+        </div>
+
+        <!-- Interactive Live Metrics Grid -->
+        <div class="motion-stats-grid">
+          <div class="stat-glass-card">
+            <div class="stat-glass-icon"><i class="fa-solid fa-gauge-high"></i></div>
+            <div class="stat-glass-data">
+              <span class="stat-glass-value">10,000+</span>
+              <span class="stat-glass-label">Mails/Hour</span>
+            </div>
+          </div>
+          <div class="stat-glass-card">
+            <div class="stat-glass-icon"><i class="fa-solid fa-shield-check"></i></div>
+            <div class="stat-glass-data">
+              <span class="stat-glass-value">AES-256</span>
+              <span class="stat-glass-label">Encrypted</span>
+            </div>
           </div>
         </div>
 
